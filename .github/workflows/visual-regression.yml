@@ -1,0 +1,156 @@
+name: Visual Regression Testing
+
+on:
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - 'app/**'
+      - 'lib/**'
+      - 'components/**'
+      - 'e2e/**'
+      - 'package.json'
+      - 'package-lock.json'
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  visual-regression:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+        
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm install -g @expo/cli
+
+      - name: Install system dependencies for headless testing
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libnss3-dev \
+            libatk-bridge2.0-dev \
+            libdrm2 \
+            libxkbcommon0 \
+            libgtk-3-dev \
+            libxss1 \
+            libasound2-dev
+
+      - name: Set up demo mode environment
+        run: |
+          # Set consistent timezone for screenshots
+          sudo timedatectl set-timezone UTC
+          # Set demo date for consistent timestamps
+          export TZ=UTC
+
+      - name: Run visual regression tests
+        run: |
+          npm run test:visual:ci
+        env:
+          NODE_ENV: test
+          CI: true
+          # Disable animations for consistent screenshots
+          EXPO_NO_DOTENV: 1
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-test-results-node-${{ matrix.node-version }}
+          path: |
+            e2e/visual/baselines/
+            e2e/visual/diffs/
+            coverage/
+          retention-days: 30
+
+      - name: Upload diff images on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-diff-images-node-${{ matrix.node-version }}
+          path: |
+            e2e/visual/diffs/
+            e2e/visual/__diff_output__/
+          retention-days: 7
+
+      - name: Comment on PR with results
+        if: github.event_name == 'pull_request' && failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            // Check if there are any diff images
+            const diffDir = 'e2e/visual/diffs';
+            let diffFiles = [];
+            
+            try {
+              if (fs.existsSync(diffDir)) {
+                diffFiles = fs.readdirSync(diffDir)
+                  .filter(file => file.endsWith('-diff.png'))
+                  .slice(0, 5); // Limit to first 5 diff images
+              }
+            } catch (error) {
+              console.log('No diff directory found');
+            }
+            
+            const comment = `## 🔍 Visual Regression Test Results
+            
+            ❌ **Visual regression tests failed!** 
+            
+            The following screens have visual differences that exceed the ≤5px threshold:
+            
+            ${diffFiles.length > 0 ? 
+              diffFiles.map(file => `- \`${file.replace('-diff.png', '')}\``).join('\n') :
+              '- Check the uploaded artifacts for detailed diff images'
+            }
+            
+            ### Next Steps:
+            1. Download the diff images from the "Artifacts" section below
+            2. Review the visual changes carefully
+            3. If changes are intentional, update baselines with: \`npm run test:visual:update\`
+            4. If changes are unintentional, fix the UI issues and push again
+            
+            ### Artifacts:
+            - 📸 **visual-diff-images-node-${{ matrix.node-version }}**: Contains diff images showing exact pixel differences
+            - 📊 **visual-test-results-node-${{ matrix.node-version }}**: Full test results and coverage reports
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  visual-regression-summary:
+    runs-on: ubuntu-latest
+    needs: visual-regression
+    if: always()
+    
+    steps:
+      - name: Check visual regression results
+        run: |
+          if [[ "${{ needs.visual-regression.result }}" == "failure" ]]; then
+            echo "❌ Visual regression tests failed!"
+            echo "Please check the uploaded diff images and update baselines if changes are intentional."
+            exit 1
+          else
+            echo "✅ All visual regression tests passed!"
+          fi 

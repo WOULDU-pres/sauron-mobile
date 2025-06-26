@@ -37,3 +37,4 @@ yarn-error.*
 *.tsbuildinfo
 
 app-example
+DESIGN_SYSTEM_PLAN.md
