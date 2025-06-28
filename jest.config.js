@@ -1,6 +1,6 @@
 module.exports = {
   preset: 'react-native',
-  setupFilesAfterEnv: ['<rootDir>/e2e/setup.ts', '@testing-library/jest-native/extend-expect'],
+  setupFilesAfterEnv: ['<rootDir>/e2e/setup.ts'],
   transformIgnorePatterns: [
     'node_modules/(?!(react-native|@react-native|expo|@expo|@unimodules|unimodules|expo-.*|@expo-google-fonts/.*|react-native-vector-icons|react-native-reanimated|@react-navigation/.*|react-native-safe-area-context|react-native-screens|lucide-react-native)/)',
   ],
@@ -12,7 +12,7 @@ module.exports = {
     '!**/node_modules/**',
   ],
   coverageReporters: ['text', 'lcov', 'html'],
-  testEnvironment: 'jsdom',
+  testEnvironment: 'node',
   moduleNameMapper: {
     '^~/(.*)$': '<rootDir>/~/$1',
   },

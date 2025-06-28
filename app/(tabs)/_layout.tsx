@@ -2,11 +2,11 @@ import { Tabs } from 'expo-router';
 import React from 'react';
 import { Platform } from 'react-native';
 
-import { HapticTab } from '../../components/HapticTab';
-import TabBarBackground from '../../components/ui/TabBarBackground';
+import { HapticTab } from '~/components/utils/HapticTab';
+import TabBarBackground from '~/components/utils/TabBarBackground';
 import { Colors } from '../../constants/Colors';
-import { useTheme } from '~/lib/theme-context';
-import { colors } from '~/lib/tokens';
+import { useTheme } from '@/~/lib/theme-context';
+import { colors } from '@/~/lib/tokens';
 
 // Lucide React Native compatible icons
 import { LayoutGrid, BarChart2, FileText, User } from 'lucide-react-native';

@@ -11,10 +11,17 @@ import {
   SafeAreaView,
 
 } from 'react-native';
-import { Card, CardContent } from '~/components/ui/card';
-import { colors, spacing } from '~/lib/tokens';
-import { createTextStyle } from '~/lib/utils';
-import { ChartSkeleton, SectionHeader } from '~/components/ui/common';
+import { Card, CardContent } from '~/components/primitives/card';
+import { colors, spacing } from '@/~/lib/tokens';
+import { createTextStyle } from '@/~/lib/utils';
+import { ChartSkeleton, SectionHeader } from '~/components/utils/common';
+import { 
+  MonthlyDetectionChart, 
+  WeeklyTrendChart, 
+  TypeDistributionChart, 
+  RealtimeStatusChart, 
+  ComprehensiveChart 
+} from '~/components/composed/charts';
 
 // ===== 데이터 타입 정의 (향후 차트 구현용) =====
 // Note: These interfaces are kept for future chart implementation
@@ -59,80 +66,19 @@ const DailyReport: React.FC = () => {
   return (
     <View>
       <SectionHeader title="일일 리포트" />
-      <Card>
-        <CardContent>
-          <Text style={[cardTitleStyle, { marginBottom: spacing.md }]}>
-            일일 이상 메시지 현황
-          </Text>
-          {/* 차트 영역 - 추후 차트 라이브러리로 교체 */}
-          <View style={{
-            height: 200,
-            backgroundColor: colors.muted,
-            borderRadius: 8,
-            padding: spacing.md,
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}>
-            <Text style={createTextStyle('sm', 'medium', 'mutedForeground')}>
-              막대 차트 영역
-            </Text>
-            <Text style={createTextStyle('xs', 'normal', 'mutedForeground')}>
-              (추후 차트 라이브러리 연동)
-            </Text>
-          </View>
-        </CardContent>
-      </Card>
+      <MonthlyDetectionChart />
     </View>
   );
 };
 
 // ===== 주간 리포트 컴포넌트 =====
 const WeeklyReport: React.FC = () => {
-  const cardTitleStyle = createTextStyle('base', 'bold', 'foreground');
-
   return (
     <View>
       <SectionHeader title="주간 리포트" />
       <View style={{ gap: spacing.md }}>
-        <Card>
-          <CardContent>
-            <Text style={[cardTitleStyle, { marginBottom: spacing.md }]}>
-              주간 이상 메시지 현황
-            </Text>
-            <View style={{
-              height: 200,
-              backgroundColor: colors.muted,
-              borderRadius: 8,
-              padding: spacing.md,
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}>
-              <Text style={createTextStyle('sm', 'medium', 'mutedForeground')}>
-                라인 차트 영역
-              </Text>
-            </View>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent>
-            <Text style={[cardTitleStyle, { marginBottom: spacing.md }]}>
-              이상 메시지 유형별 분포 (최근 30일)
-            </Text>
-            <View style={{
-              height: 250,
-              backgroundColor: colors.muted,
-              borderRadius: 8,
-              padding: spacing.md,
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}>
-              <Text style={createTextStyle('sm', 'medium', 'mutedForeground')}>
-                파이 차트 영역
-              </Text>
-            </View>
-          </CardContent>
-        </Card>
+        <WeeklyTrendChart />
+        <TypeDistributionChart />
       </View>
     </View>
   );
@@ -172,46 +118,9 @@ const ApiReport: React.FC = () => {
             사용량 분석
           </Text>
           <View style={{ gap: spacing.md }}>
-            <Card>
-              <CardContent>
-                <Text style={[cardTitleStyle, { marginBottom: spacing.md }]}>
-                  API 사용량 (최근 7일)
-                </Text>
-                <View style={{
-                  height: 200,
-                  backgroundColor: colors.muted,
-                  borderRadius: 8,
-                  padding: spacing.md,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}>
-                  <Text style={createTextStyle('sm', 'medium', 'mutedForeground')}>
-                    라인 차트 영역
-                  </Text>
-                </View>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardContent>
-                <Text style={[cardTitleStyle, { marginBottom: spacing.md }]}>
-                  시간대별 API 호출량
-                </Text>
-                <View style={{
-                  height: 200,
-                  backgroundColor: colors.muted,
-                  borderRadius: 8,
-                  padding: spacing.md,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}>
-                  <Text style={createTextStyle('sm', 'medium', 'mutedForeground')}>
-                    막대 차트 영역
-                  </Text>
-                </View>
-              </CardContent>
-            </Card>
-                     </View>
+            <ComprehensiveChart />
+            <RealtimeStatusChart />
+          </View>
          </View>
        </View>
      </View>

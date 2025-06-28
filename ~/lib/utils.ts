@@ -230,7 +230,7 @@ export function createContainerStyle(
  */
 export function createButtonStyle(
   variant: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link' = 'default',
-  size: 'default' | 'sm' | 'lg' | 'icon' = 'default',
+  size: 'default' | 'sm' | 'xs' | 'lg' | 'icon' = 'default',
   isDark: boolean = false
 ): ViewStyle {
   const themeTokens = getTokens(isDark);
@@ -267,7 +267,7 @@ export function createButtonStyle(
     },
   };
   
-  // size별 스타일
+  // size별 스타일 - xs 사이즈 추가
   const sizeStyles: Record<typeof size, ViewStyle> = {
     default: {
       paddingHorizontal: themeTokens.spacing.lg,
@@ -278,6 +278,11 @@ export function createButtonStyle(
       paddingHorizontal: themeTokens.spacing.md,
       paddingVertical: themeTokens.spacing.xs,
       minHeight: 32,
+    },
+    xs: {
+      paddingHorizontal: themeTokens.spacing.sm,
+      paddingVertical: 2,
+      minHeight: 24,
     },
     lg: {
       paddingHorizontal: themeTokens.spacing.xl,

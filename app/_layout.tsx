@@ -5,7 +5,8 @@ import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import '../global.css';
 
-import { ThemeProvider, useTheme, createNavigationTheme } from '~/lib/theme-context';
+import { ThemeProvider, useTheme, createNavigationTheme } from '@/~/lib/theme-context';
+import { ToastProvider } from '~/components/composed/toast';
 
 // 내부 컴포넌트: 테마 컨텍스트 접근 가능
 function RootLayoutInner() {
@@ -23,11 +24,13 @@ function RootLayoutInner() {
 
   return (
     <NavigationThemeProvider value={navigationTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <ToastProvider>
+        <Stack>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="+not-found" />
+        </Stack>
+        <StatusBar style={isDark ? 'light' : 'dark'} />
+      </ToastProvider>
     </NavigationThemeProvider>
   );
 }
