@@ -72,12 +72,13 @@ export const WatchedChatRoomsModal: React.FC<WatchedChatRoomsModalProps> = ({
   const [isMarkedForRemoval, setIsMarkedForRemoval] = useState(false);
 
   // chatroom이 변경될 때 상태 초기화
+  // 객체 참조 대신 개별 속성을 체크하여 불필요한 리렌더링 방지
   useEffect(() => {
     if (chatroom) {
       setSelectedStatus(chatroom.status === '활성' ? 'active' : 'inactive');
       setIsMarkedForRemoval(false);
     }
-  }, [chatroom]);
+  }, [chatroom?.name, chatroom?.status]);
   
   // Toast 훅 사용
   const { showDialog, showSuccess } = useToast();

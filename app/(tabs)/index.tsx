@@ -29,7 +29,7 @@ import {
 } from 'react-native';
 import { Megaphone, Repeat, Annoyed, ShieldCheck } from 'lucide-react-native';
 import { Card, CardContent } from '~/components/primitives/card';
-import SummaryCard from '~/components/features/dashboard/SummaryCard';
+import { SummaryCard } from '~/components/features/dashboard/SummaryCard';
 import { WatchedChatRoomsModal, type ChatroomStatus } from '~/components/features/dashboard/watched-chatrooms-modal';
 import { useWatchedChatRooms } from '~/hooks/useWatchedChatRooms';
 import { colors, spacing } from '@/~/lib/tokens';
@@ -72,6 +72,71 @@ const summaryData = [
     title: '정상 처리', 
     count: 231, 
     color: colors.customGreen 
+  },
+];
+
+// ===== 타입 정의 =====
+
+// ===== 상수 정의 (더미 데이터) =====
+
+// 대시보드용 더미 데이터 - 감지로그 탭의 데이터와 동일한 구조 사용
+const MOCK_MESSAGES: DetectedMessage[] = [
+  {
+    id: 1,
+    type: '광고',
+    content: '특가 할인! 지금 주문하면 50% 할인해드립니다!',
+    timestamp: '2024-01-15 14:30',
+    author: '사용자123',
+    chatroom: '일반채팅방',
+    confidence: 92.5,
+    reason: '광고성 키워드와 할인 문구가 포함되어 있습니다.',
+  },
+  {
+    id: 2,
+    type: '도배',
+    content: '안녕하세요 안녕하세요 안녕하세요 안녕하세요',
+    timestamp: '2024-01-15 14:25',
+    author: '사용자456',
+    chatroom: '자유채팅방',
+    confidence: 87.1,
+    reason: '동일한 문구의 반복적 사용이 감지되었습니다.',
+  },
+  {
+    id: 3,
+    type: '분쟁',
+    content: '이 사람이 욕을 했어요! 신고합니다!',
+    timestamp: '2024-01-15 14:20',
+    author: '사용자789',
+    chatroom: '일반채팅방',
+    confidence: 78.9,
+    reason: '공격적인 언어와 신고 의도가 감지되었습니다.',
+  },
+];
+
+const MOCK_ANNOUNCEMENTS: AnnouncementRequest[] = [
+  {
+    id: 1,
+    title: '시스템 점검 공지',
+    content: '내일 오후 2시부터 4시까지 시스템 점검이 있을 예정입니다.',
+    timestamp: '2024-01-15 10:00',
+    status: '대기',
+    room: 'IT 개발자 모임',
+  },
+  {
+    id: 2,
+    title: '새 기능 업데이트',
+    content: '새로운 채팅 기능이 추가되었습니다.',
+    timestamp: '2024-01-15 09:30',
+    status: '승인',
+    room: '코인 투자방',
+  },
+  {
+    id: 3,
+    title: '주요 정책 변경 안내',
+    content: '커뮤니티 운영 정책이 일부 변경됩니다. 자세한 내용은 공지사항을 확인해주세요.',
+    timestamp: '2024-01-15 09:00',
+    status: '대기',
+    room: '전체공지방',
   },
 ];
 
@@ -143,8 +208,6 @@ const styles = StyleSheet.create({
   // 알림 스타일
 
 });
-
-// ===== 타입 정의 =====
 
 // ===== 유틸리티 함수들 =====
 
@@ -240,76 +303,15 @@ const useDashboardData = (showError: (title: string, message?: string) => void) 
     }
   }, [chatroomsError, clearError, showError]);
 
-  // 대시보드용 더미 데이터 - 감지로그 탭의 데이터와 동일한 구조 사용
-  const messages: DetectedMessage[] = [
-    {
-      id: 1,
-      type: '광고',
-      content: '특가 할인! 지금 주문하면 50% 할인해드립니다!',
-      timestamp: '2024-01-15 14:30',
-      author: '사용자123',
-      chatroom: '일반채팅방',
-      confidence: 92.5,
-      reason: '광고성 키워드와 할인 문구가 포함되어 있습니다.',
-    },
-    {
-      id: 2,
-      type: '도배',
-      content: '안녕하세요 안녕하세요 안녕하세요 안녕하세요',
-      timestamp: '2024-01-15 14:25',
-      author: '사용자456',
-      chatroom: '자유채팅방',
-      confidence: 87.1,
-      reason: '동일한 문구의 반복적 사용이 감지되었습니다.',
-    },
-    {
-      id: 3,
-      type: '분쟁',
-      content: '이 사람이 욕을 했어요! 신고합니다!',
-      timestamp: '2024-01-15 14:20',
-      author: '사용자789',
-      chatroom: '일반채팅방',
-      confidence: 78.9,
-      reason: '공격적인 언어와 신고 의도가 감지되었습니다.',
-    },
-  ];
-
-  const announcements: AnnouncementRequest[] = [
-    {
-      id: 1,
-      title: '시스템 점검 공지',
-      content: '내일 오후 2시부터 4시까지 시스템 점검이 있을 예정입니다.',
-      timestamp: '2024-01-15 10:00',
-      status: '대기',
-      room: 'IT 개발자 모임',
-    },
-    {
-      id: 2,
-      title: '새 기능 업데이트',
-      content: '새로운 채팅 기능이 추가되었습니다.',
-      timestamp: '2024-01-15 09:30',
-      status: '승인',
-      room: '코인 투자방',
-    },
-    {
-      id: 3,
-      title: '주요 정책 변경 안내',
-      content: '커뮤니티 운영 정책이 일부 변경됩니다. 자세한 내용은 공지사항을 확인해주세요.',
-      timestamp: '2024-01-15 09:00',
-      status: '대기',
-      room: '전체공지방',
-    },
-  ];
-
   // 데이터 변환 최적화 - 의존성이 변경될 때만 재계산
   const messageLogBoxItems = useMemo(() => 
-    convertMessagesToLogBoxItems(messages), 
-    [messages, convertMessagesToLogBoxItems]
+    convertMessagesToLogBoxItems(MOCK_MESSAGES), 
+    [convertMessagesToLogBoxItems]
   );
 
   const announcementLogBoxItems = useMemo(() => 
-    convertAnnouncementsToLogBoxItems(announcements),
-    [announcements, convertAnnouncementsToLogBoxItems]
+    convertAnnouncementsToLogBoxItems(MOCK_ANNOUNCEMENTS),
+    [convertAnnouncementsToLogBoxItems]
   );
 
   const chatroomLogBoxItems = useMemo(() => 
@@ -391,12 +393,8 @@ const useDashboardHandlers = (
     // 클릭된 채팅방의 전체 정보를 찾아서 모달에 전달
     const chatroom = watchedChatrooms.find(room => room.name === item.name);
     if (chatroom) {
-      setSelectedChatroom({
-        name: chatroom.name,
-        members: chatroom.members,
-        lastActivity: chatroom.lastActivity,
-        status: chatroom.status,
-      });
+      // 원본 객체를 그대로 사용하여 불필요한 리렌더링 방지
+      setSelectedChatroom(chatroom);
       setModalVisible(true);
     } else {
       showInfo('요청하신 채팅방 정보를 찾을 수 없습니다', 'info');
@@ -556,7 +554,7 @@ const SummaryCardsGrid: React.FC = () => (
           <SummaryCard
             icon={item.icon}
             title={item.title}
-            count={item.count}
+            value={item.count}
             color={item.color}
           />
         </View>
