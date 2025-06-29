@@ -1,36 +1,111 @@
 import * as React from 'react';
-import * as RadioGroupPrimitive from '@rn-primitives/radio-group';
-import { View } from 'react-native';
+import { View, Pressable, ViewStyle, PressableProps } from 'react-native';
 import { cn } from '@/~/lib/utils';
 
-const RadioGroup = React.forwardRef<
-  React.ElementRef<typeof RadioGroupPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof RadioGroupPrimitive.Root>
->(({ className, ...props }, ref) => {
-  return <RadioGroupPrimitive.Root ref={ref} className={cn('web:grid gap-2', className)} {...props} />;
-});
-RadioGroup.displayName = RadioGroupPrimitive.Root.displayName;
+// RadioGroup Context for managing state
+const RadioGroupContext = React.createContext<{
+  value?: string;
+  onValueChange?: (value: string) => void;
+} | null>(null);
 
-const RadioGroupItem = React.forwardRef<
-  React.ElementRef<typeof RadioGroupPrimitive.Item>,
-  React.ComponentPropsWithoutRef<typeof RadioGroupPrimitive.Item>
->(({ className, ...props }, ref) => {
+// RadioGroup Component
+interface RadioGroupProps {
+  value?: string;
+  onValueChange?: (value: string) => void;
+  className?: string;
+  style?: ViewStyle;
+  children?: React.ReactNode;
+  accessibilityLabel?: string;
+}
+
+function RadioGroup({
+  value,
+  onValueChange,
+  className,
+  style,
+  children,
+  accessibilityLabel,
+}: RadioGroupProps) {
   return (
-    <RadioGroupPrimitive.Item
-      ref={ref}
-      className={cn(
-        'aspect-square h-4 w-4 native:h-5 native:w-5 rounded-full justify-center items-center border border-primary text-primary web:ring-offset-background web:focus:outline-none web:focus-visible:ring-2 web:focus-visible:ring-ring web:focus-visible:ring-offset-2',
-        props.disabled && 'web:cursor-not-allowed opacity-50',
-        className
-      )}
-      {...props}
-    >
-      <RadioGroupPrimitive.Indicator className='flex items-center justify-center'>
-        <View className='aspect-square h-[9px] w-[9px] native:h-[10] native:w-[10] bg-primary rounded-full' />
-      </RadioGroupPrimitive.Indicator>
-    </RadioGroupPrimitive.Item>
+    <RadioGroupContext.Provider value={{ value, onValueChange }}>
+      <View 
+        className={cn('web:grid gap-2', className)}
+        style={style}
+        accessibilityLabel={accessibilityLabel}
+        role="radiogroup"
+      >
+        {children}
+      </View>
+    </RadioGroupContext.Provider>
   );
-});
-RadioGroupItem.displayName = RadioGroupPrimitive.Item.displayName;
+}
 
-export { RadioGroup, RadioGroupItem };
+// RadioGroupItem Component
+interface RadioGroupItemProps extends Omit<PressableProps, 'onPress'> {
+  value: string;
+  className?: string;
+  style?: ViewStyle;
+  accessibilityLabel?: string;
+}
+
+function RadioGroupItem({
+  value,
+  className,
+  style,
+  accessibilityLabel,
+  disabled,
+  ...props
+}: RadioGroupItemProps) {
+  const context = React.useContext(RadioGroupContext);
+  
+  if (!context) {
+    throw new Error('RadioGroupItem must be used within a RadioGroup');
+  }
+  
+  const { value: groupValue, onValueChange } = context;
+  const isSelected = groupValue === value;
+  
+  const handlePress = React.useCallback(() => {
+    if (!disabled && onValueChange) {
+      onValueChange(value);
+    }
+  }, [value, onValueChange, disabled]);
+  
+  return (
+    <Pressable
+      onPress={handlePress}
+      disabled={disabled}
+      accessibilityRole="radio"
+      accessibilityState={{ selected: isSelected }}
+      accessibilityLabel={accessibilityLabel}
+      {...props}
+      style={[
+        {
+          width: 20,
+          height: 20,
+          borderRadius: 10,
+          borderWidth: 2,
+          borderColor: '#0f172a', // primary color
+          backgroundColor: isSelected ? '#0f172a' : 'transparent',
+          alignItems: 'center',
+          justifyContent: 'center',
+          opacity: disabled ? 0.5 : 1,
+        },
+        style,
+      ]}
+    >
+      {isSelected && (
+        <View
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: 4,
+            backgroundColor: '#ffffff', // background color for selected dot
+          }}
+        />
+      )}
+    </Pressable>
+  );
+}
+
+export { RadioGroup, RadioGroupItem }; 

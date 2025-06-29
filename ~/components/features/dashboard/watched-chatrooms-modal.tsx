@@ -3,7 +3,7 @@
  * 채팅방 활성/비활성 설정, 제거, 저장/취소 기능 제공
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { Trash2, CheckCircle, AlertCircle, Users } from 'lucide-react-native';
 import { Modal, ModalHeader, ModalContent, ModalFooter } from '~/components/composed/modal';
@@ -65,8 +65,8 @@ export const WatchedChatRoomsModal: React.FC<WatchedChatRoomsModalProps> = ({
   onRemove,
   accessibilityLabel,
 }) => {
-  // 로컬 상태
-  const [selectedStatus, setSelectedStatus] = useState<'active' | 'inactive'>(
+  // 로컬 상태 - lazy initialization으로 초기값 설정
+  const [selectedStatus, setSelectedStatus] = useState<'active' | 'inactive'>(() => 
     chatroom?.status === '활성' ? 'active' : 'inactive'
   );
   const [isMarkedForRemoval, setIsMarkedForRemoval] = useState(false);
@@ -83,22 +83,17 @@ export const WatchedChatRoomsModal: React.FC<WatchedChatRoomsModalProps> = ({
   // Toast 훅 사용
   const { showDialog, showSuccess } = useToast();
 
-  // 채팅방이 없으면 모달 표시하지 않음
-  if (!chatroom) {
-    return null;
-  }
-
-  // 이벤트 핸들러들
-  const handleStatusChange = (value: string) => {
+  // 이벤트 핸들러들 - useCallback으로 최적화하여 함수 재생성 방지
+  const handleStatusChange = useCallback((value: string) => {
     InteractionHaptics.select();
     setSelectedStatus(value as 'active' | 'inactive');
-  };
+  }, []);
 
-  const handleMarkForRemoval = () => {
+  const handleMarkForRemoval = useCallback(() => {
     InteractionHaptics.buttonPressDestructive();
     showDialog({
       title: '채팅방 제거',
-      message: `"${chatroom.name}" 채팅방을 감시 목록에서 제거하시겠습니까?`,
+      message: `"${chatroom?.name}" 채팅방을 감시 목록에서 제거하시겠습니까?`,
       confirmText: '제거',
       cancelText: '취소',
       type: 'warning',
@@ -107,40 +102,45 @@ export const WatchedChatRoomsModal: React.FC<WatchedChatRoomsModalProps> = ({
         setIsMarkedForRemoval(true);
       },
     });
-  };
+  }, [chatroom?.name, showDialog]);
 
-  const handleUnmarkForRemoval = () => {
+  const handleUnmarkForRemoval = useCallback(() => {
     InteractionHaptics.cancel();
     setIsMarkedForRemoval(false);
-  };
+  }, []);
 
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     if (isMarkedForRemoval) {
       // 제거 처리
       InteractionHaptics.buttonPressDestructive();
-      onRemove?.(chatroom.name);
-      showSuccess('완료', `${chatroom.name} 채팅방이 감시 목록에서 제거되었습니다.`);
+      onRemove?.(chatroom?.name || '');
+      showSuccess('완료', `${chatroom?.name} 채팅방이 감시 목록에서 제거되었습니다.`);
     } else {
       // 상태 업데이트 처리
       InteractionHaptics.loadSuccess();
       const status: ChatroomStatus = {
-        id: `chatroom-${chatroom.name}`,
+        id: `chatroom-${chatroom?.name}`,
         isActive: selectedStatus === 'active',
         isMarkedForRemoval: false,
       };
       onSave?.(status);
-      showSuccess('완료', `${chatroom.name} 채팅방 설정이 저장되었습니다.`);
+      showSuccess('완료', `${chatroom?.name} 채팅방 설정이 저장되었습니다.`);
     }
     onClose();
-  };
+  }, [isMarkedForRemoval, selectedStatus, chatroom?.name, onSave, onRemove, onClose, showSuccess]);
 
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     InteractionHaptics.cancel();
     // 상태 초기화
-    setSelectedStatus(chatroom.status === '활성' ? 'active' : 'inactive');
+    setSelectedStatus(chatroom?.status === '활성' ? 'active' : 'inactive');
     setIsMarkedForRemoval(false);
     onClose();
-  };
+  }, [chatroom?.status, onClose]);
+
+  // 채팅방이 없으면 모달 표시하지 않음
+  if (!chatroom) {
+    return null;
+  }
 
   return (
     <Modal
@@ -220,88 +220,78 @@ export const WatchedChatRoomsModal: React.FC<WatchedChatRoomsModalProps> = ({
               >
                 <View style={{ gap: spacing.sm }}>
                   {/* 활성화 옵션 */}
-                  <View
-                    accessibilityRole="radio"
-                    accessibilityLabel="활성화: 이 채팅방을 적극적으로 감시합니다"
-                    accessibilityState={{ selected: selectedStatus === 'active' }}
-                  >
-                    <Card style={{
-                      borderColor: selectedStatus === 'active' ? colors.primary : colors.border,
-                      borderWidth: selectedStatus === 'active' ? 2 : 1,
+                  <Card style={{
+                    borderColor: selectedStatus === 'active' ? colors.primary : colors.border,
+                    borderWidth: selectedStatus === 'active' ? 2 : 1,
+                  }}>
+                    <CardContent style={{ 
+                      padding: spacing.md,
+                      flexDirection: 'row',
+                      alignItems: 'center',
                     }}>
-                      <CardContent style={{ 
-                        padding: spacing.md,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                      }}>
-                        <RadioGroupItem 
-                          value="active" 
-                          accessibilityLabel="활성화 선택"
-                        />
-                        <View style={{ marginLeft: spacing.md, flex: 1 }}>
-                          <View style={[commonStyles.row, { marginBottom: spacing.xs }]}>
-                            <CheckCircle 
-                              size={16} 
-                              color={colors.primary}
-                              style={{ marginRight: spacing.xs }}
-                            />
-                            <Text style={createTextStyle(
-                              'base', 
-                              'semibold', 
-                              selectedStatus === 'active' ? 'primary' : 'foreground'
-                            )}>
-                              활성화
-                            </Text>
-                          </View>
-                          <Text style={createTextStyle('sm', 'normal', 'mutedForeground')}>
-                            이 채팅방을 적극적으로 감시하여 부적절한 메시지를 탐지합니다.
+                      <RadioGroupItem 
+                        value="active" 
+                        accessibilityLabel="활성화: 이 채팅방을 적극적으로 감시합니다"
+                        style={{ marginRight: spacing.md }}
+                      />
+                      <View style={{ flex: 1 }}>
+                        <View style={[commonStyles.row, { marginBottom: spacing.xs }]}>
+                          <CheckCircle 
+                            size={16} 
+                            color={colors.primary}
+                            style={{ marginRight: spacing.xs }}
+                          />
+                          <Text style={createTextStyle(
+                            'base', 
+                            'semibold', 
+                            selectedStatus === 'active' ? 'primary' : 'foreground'
+                          )}>
+                            활성화
                           </Text>
                         </View>
-                      </CardContent>
-                    </Card>
-                  </View>
+                        <Text style={createTextStyle('sm', 'normal', 'mutedForeground')}>
+                          이 채팅방을 적극적으로 감시하여 부적절한 메시지를 탐지합니다.
+                        </Text>
+                      </View>
+                    </CardContent>
+                  </Card>
 
                   {/* 비활성화 옵션 */}
-                  <View
-                    accessibilityRole="radio"
-                    accessibilityLabel="비활성화: 이 채팅방 감시를 일시 중단합니다"
-                    accessibilityState={{ selected: selectedStatus === 'inactive' }}
-                  >
-                    <Card style={{
-                      borderColor: selectedStatus === 'inactive' ? colors.primary : colors.border,
-                      borderWidth: selectedStatus === 'inactive' ? 2 : 1,
+                  <Card style={{
+                    borderColor: selectedStatus === 'inactive' ? colors.primary : colors.border,
+                    borderWidth: selectedStatus === 'inactive' ? 2 : 1,
+                  }}>
+                    <CardContent style={{ 
+                      padding: spacing.md,
+                      flexDirection: 'row',
+                      alignItems: 'center',
                     }}>
-                      <CardContent style={{ 
-                        padding: spacing.md,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                      }}>
-                        <RadioGroupItem 
-                          value="inactive" 
-                          accessibilityLabel="비활성화 선택"
-                        />
-                        <View style={{ marginLeft: spacing.md, flex: 1 }}>
-                          <View style={[commonStyles.row, { marginBottom: spacing.xs }]}>
-                            <AlertCircle 
-                              size={16} 
-                              color={colors.mutedForeground}
-                              style={{ marginRight: spacing.xs }}
-                            />
-                            <Text style={createTextStyle(
-                              'base', 
-                              'semibold', 
-                              selectedStatus === 'inactive' ? 'primary' : 'foreground'
-                            )}>
-                              비활성화
-                            </Text>
-                          </View>
-                          <Text style={createTextStyle('sm', 'normal', 'mutedForeground')}>
-                            감시를 일시 중단합니다. 언제든지 다시 활성화할 수 있습니다.
+                      <RadioGroupItem 
+                        value="inactive" 
+                        accessibilityLabel="비활성화: 감시를 일시 중단합니다"
+                        style={{ marginRight: spacing.md }}
+                      />
+                      <View style={{ flex: 1 }}>
+                        <View style={[commonStyles.row, { marginBottom: spacing.xs }]}>
+                          <AlertCircle 
+                            size={16} 
+                            color={colors.mutedForeground}
+                            style={{ marginRight: spacing.xs }}
+                          />
+                          <Text style={createTextStyle(
+                            'base', 
+                            'semibold', 
+                            selectedStatus === 'inactive' ? 'primary' : 'foreground'
+                          )}>
+                            비활성화
                           </Text>
                         </View>
-                      </CardContent>
-                    </Card>
-                  </View>
+                        <Text style={createTextStyle('sm', 'normal', 'mutedForeground')}>
+                          감시를 일시 중단합니다. 언제든지 다시 활성화할 수 있습니다.
+                        </Text>
+                      </View>
+                    </CardContent>
+                  </Card>
                 </View>
               </RadioGroup>
             </View>
