@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { NativeModules, DeviceEventEmitter, EmitterSubscription } from 'react-native';
+import { useMessageTransmission } from './useMessageTransmission';
 import type { 
   NotificationData, 
   NotificationBridgeInterface,
@@ -24,6 +25,16 @@ export const useNotificationBridge = () => {
 
   const eventSubscriptionRef = useRef<EmitterSubscription | null>(null);
   const bridge = NativeModules.NotificationBridge as NotificationBridgeInterface;
+
+  // Initialize message transmission hook
+  const messageTransmission = useMessageTransmission({
+    onSuccess: (response) => {
+      console.log(`Notification ${response.messageId} transmitted successfully to server`);
+    },
+    onError: (error) => {
+      console.error(`Notification transmission failed:`, error);
+    },
+  });
 
   /**
    * 권한 상태 확인
@@ -226,16 +237,30 @@ export const useNotificationBridge = () => {
   }, [bridge]);
 
   /**
-   * 새로운 알림 추가
+   * 새로운 알림 추가 및 서버 전송
    */
-  const addNotification = useCallback((notification: NotificationData) => {
+  const addNotification = useCallback(async (notification: NotificationData) => {
+    // Add to local notifications immediately
     setNotifications(prev => [notification, ...prev]);
     setServiceStatus(prev => ({
       ...prev,
       lastActivity: Date.now(),
       processedCount: prev.processedCount + 1,
     }));
-  }, []);
+
+    // Attempt server transmission
+    try {
+      // Determine transmission priority based on notification type
+      const priority = notification.isAnnouncement ? 'high' : 'normal';
+      
+      console.log(`Attempting to transmit notification ${notification.id} to server...`);
+      await messageTransmission.transmitMessage(notification, priority);
+    } catch (error) {
+      // Transmission failed - error is already handled by the transmission hook
+      // The message will be queued for retry if the error is retryable
+      console.log(`Notification ${notification.id} transmission failed, will retry if possible`);
+    }
+  }, [messageTransmission]);
 
   /**
    * 알림 삭제
@@ -301,6 +326,18 @@ export const useNotificationBridge = () => {
     
     // Utils
     isServiceAvailable: !!bridge,
+    
+    // Message Transmission (T-003 integration)
+    transmission: {
+      isTransmitting: messageTransmission.isTransmitting,
+      isOnline: messageTransmission.isOnline,
+      queueSize: messageTransmission.queueSize,
+      stats: messageTransmission.stats,
+      isServerHealthy: messageTransmission.isServerHealthy,
+      processQueue: messageTransmission.processQueue,
+      clearQueue: messageTransmission.clearQueue,
+      checkServerHealth: messageTransmission.checkServerHealth,
+    },
   };
 };
 

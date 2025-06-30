@@ -12,7 +12,7 @@ module.exports = {
     '!**/node_modules/**',
   ],
   coverageReporters: ['text', 'lcov', 'html'],
-  testEnvironment: 'node',
+  testEnvironment: 'jsdom',
   moduleNameMapper: {
     '^~/(.*)$': '<rootDir>/~/$1',
   },
