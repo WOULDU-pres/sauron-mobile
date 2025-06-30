@@ -13,7 +13,9 @@ import type {
   DetectionLogState,
   MessageType 
 } from '~/types/detection-log';
-import { showToast, presetToasts } from '~/components/composed/toast';
+// Toast 기능은 임시로 제거 (구현 후 다시 활성화)
+import { useNotificationBridge } from './useNotificationBridge';
+import { convertNotificationBatch, getNotificationStats } from '~/lib/notificationAdapter';
 
 // ===== 모의 데이터 =====
 const MOCK_MESSAGES: DetectedMessage[] = [
@@ -242,10 +244,21 @@ const filterAnnouncements = (
 
 // ===== 메인 Hook =====
 export const useDetectedLog = (): UseDetectedLogReturn => {
+  // NotificationBridge 훅 사용
+  const {
+    notifications,
+    loading: bridgeLoading,
+    error: bridgeError,
+    getStoredNotifications,
+    clearStoredNotifications,
+    checkPermission,
+    openSettings,
+  } = useNotificationBridge();
+
   // ===== 상태 정의 =====
   const [state, setState] = useState<DetectionLogState>({
-    messages: MOCK_MESSAGES,
-    announcements: MOCK_ANNOUNCEMENTS,
+    messages: [],
+    announcements: [],
     selectedIds: new Set<number>(),
     isLoading: false,
     filters: {
@@ -256,6 +269,7 @@ export const useDetectedLog = (): UseDetectedLogReturn => {
   });
   
   const [error, setError] = useState<string | null>(null);
+  const [permissionChecked, setPermissionChecked] = useState(false);
 
   // ===== 계산된 값들 =====
   const filteredMessages = useMemo(() => 
@@ -279,22 +293,38 @@ export const useDetectedLog = (): UseDetectedLogReturn => {
       setState(prev => ({ ...prev, isLoading: true }));
       setError(null);
       
-      // 모의 데이터 새로고침 (실제로는 API 호출)
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // 권한 확인
+      if (!permissionChecked) {
+        const granted = await checkPermission();
+        setPermissionChecked(true);
+        
+        if (!granted) {
+          setError('알림 접근 권한이 필요합니다. 설정에서 권한을 허용해주세요.');
+          setState(prev => ({ ...prev, isLoading: false }));
+          return;
+        }
+      }
+      
+      // 저장된 알림 데이터 가져오기
+      const storedNotifications = await getStoredNotifications();
+      
+      // NotificationData를 DetectedMessage/AnnouncementRequest로 변환
+      const convertedData = convertNotificationBatch(storedNotifications);
       
       setState(prev => ({ 
         ...prev, 
         isLoading: false,
-        messages: MOCK_MESSAGES,
-        announcements: MOCK_ANNOUNCEMENTS,
+        messages: convertedData.messages,
+        announcements: convertedData.announcements,
       }));
       
-      presetToasts.info.refreshed();
+      console.log(`[useDetectedLog] Loaded ${convertedData.messages.length} messages, ${convertedData.announcements.length} announcements`);
+      
     } catch (err) {
       setError(err instanceof Error ? err.message : '데이터를 불러오는데 실패했습니다.');
       setState(prev => ({ ...prev, isLoading: false }));
     }
-  }, []);
+  }, [getStoredNotifications, checkPermission, permissionChecked]);
 
   const updateFilters = useCallback((newFilters: Partial<DetectionLogFilters>) => {
     setState(prev => ({
@@ -331,7 +361,7 @@ export const useDetectedLog = (): UseDetectedLogReturn => {
       messages: prev.messages.filter(msg => msg.id !== id),
       selectedIds: new Set([...prev.selectedIds].filter(selectedId => selectedId !== id)),
     }));
-    showToast.success('메시지 확인 완료', `메시지 #${id}가 확인 완료 처리되었습니다.`);
+    console.log(`[useDetectedLog] Message acknowledged: #${id}`);
   }, []);
 
   const ignoreMessage = useCallback((id: number) => {
@@ -340,7 +370,7 @@ export const useDetectedLog = (): UseDetectedLogReturn => {
       messages: prev.messages.filter(msg => msg.id !== id),
       selectedIds: new Set([...prev.selectedIds].filter(selectedId => selectedId !== id)),
     }));
-    showToast.warning('메시지 무시됨', `메시지 #${id}가 무시 처리되었습니다.`);
+    console.log(`[useDetectedLog] Message ignored: #${id}`);
   }, []);
 
   const batchAcknowledge = useCallback(() => {
@@ -350,7 +380,7 @@ export const useDetectedLog = (): UseDetectedLogReturn => {
       messages: prev.messages.filter(msg => !prev.selectedIds.has(msg.id)),
       selectedIds: new Set(),
     }));
-    showToast.success('일괄 확인 완료', `${count}개의 메시지가 확인 완료 처리되었습니다.`);
+    console.log(`[useDetectedLog] Batch acknowledged: ${count} messages`);
   }, [state.selectedIds]);
 
   const batchIgnore = useCallback(() => {
@@ -360,13 +390,28 @@ export const useDetectedLog = (): UseDetectedLogReturn => {
       messages: prev.messages.filter(msg => !prev.selectedIds.has(msg.id)),
       selectedIds: new Set(),
     }));
-    showToast.warning('일괄 무시됨', `${count}개의 메시지가 무시 처리되었습니다.`);
+    console.log(`[useDetectedLog] Batch ignored: ${count} messages`);
   }, [state.selectedIds]);
+
+  // ===== 실시간 알림 처리 =====
+  useEffect(() => {
+    if (notifications.length > 0) {
+      const convertedData = convertNotificationBatch(notifications);
+      
+      setState(prev => ({
+        ...prev,
+        messages: convertedData.messages,
+        announcements: convertedData.announcements,
+      }));
+      
+      console.log(`[useDetectedLog] Real-time update: ${convertedData.messages.length} messages, ${convertedData.announcements.length} announcements`);
+    }
+  }, [notifications]);
 
   // ===== 초기 데이터 로딩 =====
   useEffect(() => {
     refreshData();
-  }, []);
+  }, [refreshData]);
 
   // ===== 반환값 =====
   return {

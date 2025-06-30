@@ -20,10 +20,11 @@ import { createTextStyle, createContainerStyle, createButtonStyle, createShadowS
 import { getMessageTypeColor, commonStyles, EmptyState, Tag } from '~/components/utils/common';
 import { DatePickerWithRange, DateRange } from '~/components/composed/date-picker-with-range';
 import { MessageDetailModal } from '~/components/composed/enhanced-modal';
-import { showToast, presetToasts } from '~/components/composed/toast';
+// import { showToast, presetToasts } from '~/components/composed/toast'; // 임시로 비활성화
 import { DetectedMessageList } from '~/components/composed/detected-message';
 import { useDetectedLog } from '~/hooks/useDetectedLog';
 import { useDetectedMessageModal } from '~/hooks/useDetectedMessageModal';
+import { useNotificationBridge } from '~/hooks/useNotificationBridge';
 import { CommonIcon } from '~/components/utils/common-icon';
 import type { DetectedMessage, AnnouncementRequest } from '~/types/detection-log';
 
@@ -69,6 +70,90 @@ const AnnouncementItemComponent: React.FC<{ item: AnnouncementRequest }> = ({ it
             </View>
           )}
         </View>
+      </CardContent>
+    </Card>
+  );
+};
+
+// ===== NotificationBridge 상태 헤더 컴포넌트 =====
+const NotificationBridgeStatus: React.FC = () => {
+  const {
+    permissionGranted,
+    serviceStatus,
+    loading,
+    error,
+    checkPermission,
+    openSettings,
+  } = useNotificationBridge();
+
+  const getStatusColor = () => {
+    if (error) return colors.destructive;
+    if (!permissionGranted) return colors.customOrange;
+    if (serviceStatus.serviceRunning) return colors.customGreen;
+    return colors.mutedForeground;
+  };
+
+  const getStatusText = () => {
+    if (error) return '오류 발생';
+    if (!permissionGranted) return '권한 필요';
+    if (serviceStatus.serviceRunning) return '연결됨';
+    return '연결 대기';
+  };
+
+  return (
+    <Card style={{ marginBottom: spacing.sm }}>
+      <CardContent style={{ padding: spacing.sm }}>
+        <View style={commonStyles.rowSpaceBetween}>
+          <View style={commonStyles.row}>
+            <View style={[
+              { 
+                width: 8, 
+                height: 8, 
+                borderRadius: 4, 
+                backgroundColor: getStatusColor(),
+                marginRight: spacing.xs
+              }
+            ]} />
+            <Text style={createTextStyle('sm', 'medium', 'foreground')}>
+              NotificationBridge: {getStatusText()}
+            </Text>
+          </View>
+          
+          <View style={commonStyles.row}>
+            {!permissionGranted && (
+              <Pressable
+                style={[createButtonStyle('outline', 'xs'), { marginRight: spacing.xs }]}
+                onPress={openSettings}
+              >
+                <Text style={createTextStyle('xs', 'medium', 'foreground')}>
+                  권한 설정
+                </Text>
+              </Pressable>
+            )}
+            
+            <Pressable
+              style={createButtonStyle('outline', 'xs')}
+              onPress={checkPermission}
+              disabled={loading}
+            >
+              <Text style={createTextStyle('xs', 'medium', 'foreground')}>
+                {loading ? '확인중...' : '상태 확인'}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+        
+        {error && (
+          <Text style={[createTextStyle('xs', 'normal', 'destructive'), { marginTop: spacing.xs }]}>
+            오류: {error.message}
+          </Text>
+        )}
+        
+        {serviceStatus.serviceRunning && (
+          <Text style={[createTextStyle('xs', 'normal', 'mutedForeground'), { marginTop: spacing.xs }]}>
+            처리된 알림: {serviceStatus.processedCount}개 | 마지막 활동: {new Date(serviceStatus.lastActivity).toLocaleTimeString()}
+          </Text>
+        )}
       </CardContent>
     </Card>
   );
@@ -144,6 +229,9 @@ export default function DetectionLogScreen() {
          <Text style={createTextStyle('xl', 'bold', 'foreground')}>
            감지로그
          </Text>
+         
+         {/* NotificationBridge 상태 */}
+         <NotificationBridgeStatus />
         
         {/* 검색 */}
         <View style={{ marginTop: spacing.sm }}>
