@@ -9,7 +9,7 @@ import { useTheme } from '@/~/lib/theme-context';
 import { colors } from '@/~/lib/tokens';
 
 // Lucide React Native compatible icons
-import { LayoutGrid, BarChart2, FileText, User } from 'lucide-react-native';
+import { LayoutGrid, BarChart2, FileText, User, Settings } from 'lucide-react-native';
 
 export default function TabLayout() {
   const { isDark } = useTheme();
@@ -49,6 +49,13 @@ export default function TabLayout() {
         options={{
           title: '감지로그',
           tabBarIcon: ({ color, size }) => <FileText size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="operations"
+        options={{
+          title: '운영관리',
+          tabBarIcon: ({ color, size }) => <Settings size={size} color={color} />,
         }}
       />
       <Tabs.Screen

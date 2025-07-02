@@ -14,7 +14,15 @@
     "test:visual:update": "jest --testPathPatterns=e2e/visual --updateSnapshot",
     "test:visual:ci": "jest --testPathPatterns=e2e/visual --ci --coverage=false",
     "generate-baselines": "jest --testPathPatterns=e2e/visual --updateSnapshot --verbose",
-    "visual-test": "node scripts/run-visual-tests.js"
+    "visual-test": "node scripts/run-visual-tests.js",
+    "build:development": "eas build --profile development --platform all",
+    "build:preview": "eas build --profile preview --platform all",
+    "build:production": "eas build --profile production --platform all",
+    "build:android": "eas build --profile preview --platform android",
+    "build:ios": "eas build --profile preview --platform ios",
+    "submit:production": "eas submit --profile production --platform all",
+    "update:staging": "eas update --branch develop --message \"Staging update\"",
+    "update:production": "eas update --branch main --message \"Production update\""
   },
   "dependencies": {
     "@expo/vector-icons": "^14.1.0",
@@ -89,6 +97,7 @@
     "expo-status-bar": "~2.2.3",
     "expo-symbols": "~0.4.5",
     "expo-system-ui": "~5.0.9",
+    "expo-updates": "~0.27.7",
     "expo-web-browser": "~14.2.0",
     "lucide-react-native": "^0.525.0",
     "nativewind": "^4.1.23",

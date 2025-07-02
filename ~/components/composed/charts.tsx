@@ -363,4 +363,226 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     gap: spacing.lg,
   },
-}); 
+});
+
+// New Operations Dashboard Charts
+
+// Cost Analytics Chart
+export interface CostAnalyticsData {
+  date: string;
+  provider: string;
+  totalRequests: number;
+  totalCost: number;
+  averageCostPerRequest: number;
+  errorCount: number;
+}
+
+export const CostAnalyticsChart: React.FC<{ data: CostAnalyticsData[] }> = ({ data }) => {
+  // Transform data for chart display
+  const chartData = data.slice(0, 7).map((item, index) => ({
+    value: item.totalCost,
+    label: new Date(item.date).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }),
+    frontColor: item.totalCost > 1 ? colors.customRed : 
+                item.totalCost > 0.5 ? colors.customOrange : colors.customGreen,
+    dataPointText: `$${item.totalCost.toFixed(2)}`,
+  }));
+
+  if (!data || data.length === 0) {
+    return (
+      <View style={styles.chartContainer}>
+        <Text style={[styles.chartSubtitle, { textAlign: 'center' }]}>
+          비용 데이터가 없습니다
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.chartContainer}>
+      <LineChart
+        data={chartData}
+        width={300}
+        height={200}
+        spacing={40}
+        color={colors.primary}
+        thickness={3}
+        dataPointsRadius={6}
+        isAnimated
+        animationDuration={1200}
+        curved
+        showVerticalLines
+        verticalLinesColor={colors.border}
+        yAxisThickness={1}
+        yAxisColor={colors.border}
+        xAxisThickness={1}
+        xAxisColor={colors.border}
+        yAxisTextStyle={{
+          color: colors.mutedForeground,
+          fontSize: 10,
+        }}
+        xAxisLabelTextStyle={{
+          color: colors.mutedForeground,
+          fontSize: 10,
+        }}
+        rulesColor={colors.border}
+        backgroundColor={colors.card}
+        dataPointTextColor={colors.foreground}
+        textFontSize={10}
+        textShiftY={-15}
+      />
+    </View>
+  );
+};
+
+// Budget Utilization Chart
+export interface BudgetUtilizationData {
+  provider: string;
+  monthYear: string;
+  budgetLimit: number;
+  currentUsage: number;
+  utilizationPercentage: number;
+  daysRemaining: number;
+  projectedMonthlyCost: number;
+  status: string;
+}
+
+export const BudgetUtilizationChart: React.FC<{ data: BudgetUtilizationData[] }> = ({ data }) => {
+  if (!data || data.length === 0) {
+    return (
+      <View style={styles.chartContainer}>
+        <Text style={[styles.chartSubtitle, { textAlign: 'center' }]}>
+          예산 데이터가 없습니다
+        </Text>
+      </View>
+    );
+  }
+
+  const chartData = data.map((item) => ({
+    value: Math.min(item.utilizationPercentage, 100),
+    label: item.provider.toUpperCase(),
+    frontColor: item.status === 'CRITICAL' ? colors.customRed :
+                item.status === 'WARNING' ? colors.customOrange : colors.customGreen,
+    dataPointText: `${item.utilizationPercentage.toFixed(1)}%`,
+  }));
+
+  return (
+    <View style={styles.chartContainer}>
+      <BarChart
+        data={chartData}
+        width={300}
+        height={200}
+        barWidth={35}
+        spacing={30}
+        barBorderRadius={4}
+        noOfSections={4}
+        maxValue={100}
+        isAnimated
+        animationDuration={1000}
+        yAxisThickness={1}
+        yAxisColor={colors.border}
+        xAxisThickness={1}
+        xAxisColor={colors.border}
+        yAxisTextStyle={{
+          color: colors.mutedForeground,
+          fontSize: 10,
+        }}
+        xAxisLabelTextStyle={{
+          color: colors.mutedForeground,
+          fontSize: 10,
+        }}
+        rulesColor={colors.border}
+        backgroundColor={colors.card}
+        showReferenceLine1
+        referenceLine1Position={80}
+        referenceLine1Config={{
+          color: colors.customOrange,
+          thickness: 2,
+          width: 300,
+          type: 'dashed' as const,
+        }}
+      />
+    </View>
+  );
+};
+
+// System Health Chart
+export interface PerformanceMetricData {
+  timestamp: string;
+  metricName: string;
+  metricValue: number;
+  metricUnit: string;
+  serviceComponent: string;
+}
+
+export const SystemHealthChart: React.FC<{ data: PerformanceMetricData[] }> = ({ data }) => {
+  if (!data || data.length === 0) {
+    return (
+      <View style={styles.chartContainer}>
+        <Text style={[styles.chartSubtitle, { textAlign: 'center' }]}>
+          성능 데이터가 없습니다
+        </Text>
+      </View>
+    );
+  }
+
+  // Group data by metric name and take recent values
+  const responseTimeData = data
+    .filter(item => item.metricName.includes('response_time'))
+    .slice(-7)
+    .map((item, index) => ({
+      value: item.metricValue,
+      dataPointText: `${item.metricValue.toFixed(0)}ms`,
+    }));
+
+  const throughputData = data
+    .filter(item => item.metricName.includes('throughput'))
+    .slice(-7)
+    .map((item, index) => ({
+      value: item.metricValue,
+      dataPointText: `${item.metricValue.toFixed(0)}`,
+    }));
+
+  return (
+    <View style={styles.chartContainer}>
+      <LineChart
+        data={responseTimeData}
+        data2={throughputData}
+        width={300}
+        height={200}
+        spacing={40}
+        color={colors.customRed}
+        color2={colors.primary}
+        thickness={3}
+        thickness2={3}
+        dataPointsRadius={5}
+        dataPointsRadius2={5}
+        isAnimated
+        animationDuration={1500}
+        curved
+        showVerticalLines
+        verticalLinesColor={colors.border}
+        yAxisThickness={1}
+        yAxisColor={colors.border}
+        xAxisThickness={1}
+        xAxisColor={colors.border}
+        yAxisTextStyle={{
+          color: colors.mutedForeground,
+          fontSize: 10,
+        }}
+        rulesColor={colors.border}
+        backgroundColor={colors.card}
+      />
+      
+      <View style={styles.multiLegend}>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendColor, { backgroundColor: colors.customRed }]} />
+          <Text style={styles.legendText}>응답시간 (ms)</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendColor, { backgroundColor: colors.primary }]} />
+          <Text style={styles.legendText}>처리량 (req/s)</Text>
+        </View>
+      </View>
+    </View>
+  );
+}; 

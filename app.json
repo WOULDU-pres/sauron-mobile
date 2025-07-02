@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "sauron-mobile",
+    "name": "Sauron Mobile",
     "slug": "sauron-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -8,8 +8,17 @@
     "scheme": "sauronmobile",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "owner": "sauron-team",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/your-project-id"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.sauronteam.sauronmobile",
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
@@ -17,7 +26,9 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.anonymous.sauronmobile"
+      "package": "com.sauronteam.sauronmobile",
+      "versionCode": 1,
+      "permissions": ["NOTIFICATIONS", "BIND_NOTIFICATION_LISTENER_SERVICE"]
     },
     "web": {
       "bundler": "metro",
@@ -38,6 +49,9 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
-  }
+    },
+    "sdkVersion": "53.0.0",
+    "entryPoint": ".vscode/exponentIndex.js"
+  },
+  "name": "sauron-mobile"
 }
