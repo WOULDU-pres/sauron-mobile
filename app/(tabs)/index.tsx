@@ -26,8 +26,10 @@ import {
   SafeAreaView,
   ActivityIndicator,
   StyleSheet,
+  RefreshControl,
+  TouchableOpacity,
 } from 'react-native';
-import { Megaphone, Repeat, Annoyed, ShieldCheck } from 'lucide-react-native';
+import { Megaphone, Repeat, Annoyed, ShieldCheck, Activity, Wifi, WifiOff } from 'lucide-react-native';
 import { Card, CardContent } from '~/components/primitives/card';
 import { SummaryCard } from '~/components/features/dashboard/SummaryCard';
 import { WatchedChatRoomsModal, type ChatroomStatus } from '~/components/features/dashboard/watched-chatrooms-modal';
@@ -37,6 +39,10 @@ import { createTextStyle, createContainerStyle } from '@/~/lib/utils';
 import { DetectedMessageLogBox, type LogBoxItem } from '~/components/composed/detected-message-log-box';
 import { useDetectedMessageLog, type DashboardChatroom } from '~/hooks/useDetectedMessageLog';
 import { useToast } from '~/hooks/useToast';
+import { useDashboardApi } from '~/hooks/useDashboardApi';
+import { usePerformanceMonitor } from '~/hooks/usePerformanceMonitor';
+import { initializeErrorLogger } from '~/lib/errorLogger';
+import PerformanceMonitorDashboard from '~/components/features/monitoring/PerformanceMonitorDashboard';
 import type { DetectedMessage, AnnouncementRequest } from '~/types/detection-log';
 
 // ===== 상수 정의 =====
@@ -47,98 +53,12 @@ const LOADING_TIMEOUT = 1500;
 /** 에러 상태 자동 클리어 시간 (ms) */
 const ERROR_CLEAR_TIMEOUT = 5000;
 
-/** 대시보드 요약 카드 데이터 */
-const summaryData = [
-  { 
-    icon: Megaphone, 
-    title: '광고', 
-    count: 14, 
-    color: colors.customRed 
-  },
-  { 
-    icon: Repeat, 
-    title: '도배', 
-    count: 8, 
-    color: colors.customOrange 
-  },
-  { 
-    icon: Annoyed, 
-    title: '분쟁/욕설', 
-    count: 5, 
-    color: colors.customPurple 
-  },
-  { 
-    icon: ShieldCheck, 
-    title: '정상 처리', 
-    count: 231, 
-    color: colors.customGreen 
-  },
-];
+/** 성능 모니터링 설정 */
+const PERFORMANCE_MONITORING_ENABLED = __DEV__; // 개발 환경에서만 활성화
 
 // ===== 타입 정의 =====
 
-// ===== 상수 정의 (더미 데이터) =====
-
-// 대시보드용 더미 데이터 - 감지로그 탭의 데이터와 동일한 구조 사용
-const MOCK_MESSAGES: DetectedMessage[] = [
-  {
-    id: 1,
-    type: '광고',
-    content: '특가 할인! 지금 주문하면 50% 할인해드립니다!',
-    timestamp: '2024-01-15 14:30',
-    author: '사용자123',
-    chatroom: '일반채팅방',
-    confidence: 92.5,
-    reason: '광고성 키워드와 할인 문구가 포함되어 있습니다.',
-  },
-  {
-    id: 2,
-    type: '도배',
-    content: '안녕하세요 안녕하세요 안녕하세요 안녕하세요',
-    timestamp: '2024-01-15 14:25',
-    author: '사용자456',
-    chatroom: '자유채팅방',
-    confidence: 87.1,
-    reason: '동일한 문구의 반복적 사용이 감지되었습니다.',
-  },
-  {
-    id: 3,
-    type: '분쟁',
-    content: '이 사람이 욕을 했어요! 신고합니다!',
-    timestamp: '2024-01-15 14:20',
-    author: '사용자789',
-    chatroom: '일반채팅방',
-    confidence: 78.9,
-    reason: '공격적인 언어와 신고 의도가 감지되었습니다.',
-  },
-];
-
-const MOCK_ANNOUNCEMENTS: AnnouncementRequest[] = [
-  {
-    id: 1,
-    title: '시스템 점검 공지',
-    content: '내일 오후 2시부터 4시까지 시스템 점검이 있을 예정입니다.',
-    timestamp: '2024-01-15 10:00',
-    status: '대기',
-    room: 'IT 개발자 모임',
-  },
-  {
-    id: 2,
-    title: '새 기능 업데이트',
-    content: '새로운 채팅 기능이 추가되었습니다.',
-    timestamp: '2024-01-15 09:30',
-    status: '승인',
-    room: '코인 투자방',
-  },
-  {
-    id: 3,
-    title: '주요 정책 변경 안내',
-    content: '커뮤니티 운영 정책이 일부 변경됩니다. 자세한 내용은 공지사항을 확인해주세요.',
-    timestamp: '2024-01-15 09:00',
-    status: '대기',
-    room: '전체공지방',
-  },
-];
+// API 데이터를 사용하므로 더미 데이터는 제거되었습니다.
 
 // ===== 스타일 정의 =====
 
@@ -205,290 +125,51 @@ const styles = StyleSheet.create({
   },
 
   
-  // 알림 스타일
-
+  // 연결 상태 스타일
+  connectionStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.muted,
+    borderRadius: 8,
+    marginTop: spacing.sm,
+  },
+  connectionIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  connectionText: {
+    ...createTextStyle('xs', 'medium', 'mutedForeground'),
+    marginLeft: spacing.xs,
+  },
+  serverIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: spacing.xs,
+  },
+  lastUpdatedText: {
+    ...createTextStyle('xs', 'normal', 'mutedForeground'),
+  },
+  
+  // 헤더 개선 스타일
+  headerTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  performanceButton: {
+    padding: spacing.sm,
+    borderRadius: 8,
+    backgroundColor: colors.secondary,
+  },
 });
 
 // ===== 유틸리티 함수들 =====
 
-/**
- * 채팅방 이름을 기반으로 고유 ID를 생성합니다.
- * 
- * @param name - 채팅방 이름
- * @returns 생성된 채팅방 ID (예: "chatroom-general-chat")
- */
-const generateChatroomId = (name: string): string => 
-  `chatroom-${name.replace(/\s+/g, '-').toLowerCase()}`;
-
-/**
- * 랜덤한 채팅방 이름을 생성합니다.
- * 
- * @returns 생성된 채팅방 이름
- */
-const generateRandomChatroomName = (): string => {
-  const prefixes = ['개발', '일반', '취미', '게임', '스터디', '프로젝트'];
-  const suffixes = ['톡방', '채팅', '모임', '그룹', '커뮤니티', '클럽'];
-  const numbers = Math.floor(Math.random() * 1000);
-  
-  const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
-  const suffix = suffixes[Math.floor(Math.random() * suffixes.length)];
-  
-  return `${prefix} ${suffix} ${numbers}`;
-};
-
-// ===== 커스텀 훅들 =====
-
-/**
- * 대시보드에 표시될 데이터들을 관리하는 커스텀 훅
- * 
- * @param showError - 에러 알림 표시 함수
- * @returns 대시보드 데이터와 관련 함수들
- */
-const useDashboardData = (showError: (title: string, message?: string) => void) => {
-  // 감시 중인 채팅방 데이터 관리
-  const {
-    chatrooms: watchedChatrooms,
-    isLoading: chatroomsLoading,
-    error: chatroomsError,
-    hasChanges,
-    updateChatroomStatus,
-    removeChatroom,
-    clearError,
-  } = useWatchedChatRooms({
-    // 감시 중인 채팅방 더미 데이터
-    initialChatrooms: [
-      {
-        name: '일반 채팅방',
-        members: 1247,
-        lastActivity: '5분 전',
-        status: '활성',
-      },
-      {
-        name: '투자 정보방',
-        members: 892,
-        lastActivity: '2시간 전',
-        status: '활성',
-      },
-      {
-        name: '자유수다방',
-        members: 634,
-        lastActivity: '15분 전',
-        status: '비활성',
-      },
-    ],
-    onSuccess: (message, action) => {
-      console.log(`Success: ${action} - ${message}`);
-    },
-    onError: (error, context) => {
-      console.error(`Error in ${context}:`, error);
-      showError('오류가 발생했습니다', context);
-    },
-  });
-
-  // 감지된 메시지 데이터 변환 함수들
-  const {
-    convertMessagesToLogBoxItems,
-    convertAnnouncementsToLogBoxItems,
-    convertChatroomsToLogBoxItems,
-  } = useDetectedMessageLog({ compact: true });
-
-  // 채팅방 에러 상태 자동 정리
-  useEffect(() => {
-    if (chatroomsError) {
-      showError('채팅방 데이터 오류', '채팅방 데이터를 불러오는 중 오류가 발생했습니다');
-      const timer = setTimeout(() => {
-        clearError();
-      }, ERROR_CLEAR_TIMEOUT);
-      return () => clearTimeout(timer);
-    }
-  }, [chatroomsError, clearError, showError]);
-
-  // 데이터 변환 최적화 - 의존성이 변경될 때만 재계산
-  const messageLogBoxItems = useMemo(() => 
-    convertMessagesToLogBoxItems(MOCK_MESSAGES), 
-    [convertMessagesToLogBoxItems]
-  );
-
-  const announcementLogBoxItems = useMemo(() => 
-    convertAnnouncementsToLogBoxItems(MOCK_ANNOUNCEMENTS),
-    [convertAnnouncementsToLogBoxItems]
-  );
-
-  const chatroomLogBoxItems = useMemo(() => 
-    convertChatroomsToLogBoxItems(
-      watchedChatrooms.map(room => ({
-        name: room.name,
-        members: room.members,
-        lastActivity: room.lastActivity,
-        status: room.status,
-      }))
-    ),
-    [watchedChatrooms, convertChatroomsToLogBoxItems]
-  );
-
-  return {
-    watchedChatrooms,
-    chatroomsLoading,
-    chatroomsError,
-    hasChanges,
-    updateChatroomStatus,
-    removeChatroom,
-    messageLogBoxItems,
-    announcementLogBoxItems,
-    chatroomLogBoxItems,
-  };
-};
-
-/**
- * 대시보드 화면의 사용자 인터랙션을 처리하는 커스텀 훅
- * 
- * @param watchedChatrooms - 감시 중인 채팅방 목록
- * @param updateChatroomStatus - 채팅방 상태 업데이트 함수
- * @param removeChatroom - 채팅방 제거 함수
- * @param showSuccess - 성공 알림 표시 함수
- * @param showError - 오류 알림 표시 함수
- * @param showInfo - 정보 알림 표시 함수
- * @returns 이벤트 핸들러들과 모달 상태
- */
-const useDashboardHandlers = (
-  watchedChatrooms: any[],
-  updateChatroomStatus: (id: string, status: ChatroomStatus) => Promise<boolean>,
-  removeChatroom: (id: string) => Promise<boolean>,
-  showSuccess: (title: string, message?: string) => void,
-  showError: (title: string, message?: string) => void,
-  showInfo: (title: string, message?: string) => void
-) => {
-  // 채팅방 관리 모달 상태
-  const [modalVisible, setModalVisible] = useState(false);
-  const [selectedChatroom, setSelectedChatroom] = useState<DashboardChatroom | undefined>(undefined);
-
-  // LogBox 아이템별 클릭 핸들러들
-  
-  /**
-   * 메시지 아이템 클릭 처리
-   */
-  const handleMessagePress = useCallback((item: LogBoxItem) => {
-    if (item.type !== 'message') return;
-    
-    showInfo(`${item.messageType} 메시지 상세 정보를 확인합니다`, 'info');
-    // TODO: 실제 메시지 상세 화면으로 이동 구현 필요
-  }, [showInfo]);
-
-  /**
-   * 공지사항 아이템 클릭 처리
-   */
-  const handleAnnouncementPress = useCallback((item: LogBoxItem) => {
-    if (item.type !== 'announcement') return;
-
-    showInfo('공지사항을 확인했습니다', 'info');
-    // TODO: 실제 공지사항 상세 화면으로 이동 구현 필요
-  }, [showInfo]);
-
-  /**
-   * 채팅방 아이템 클릭 처리 - 관리 모달을 열어 상세 설정 가능
-   */
-  const handleChatroomPress = useCallback((item: LogBoxItem) => {
-    if (item.type !== 'chatroom') return;
-
-    // 클릭된 채팅방의 전체 정보를 찾아서 모달에 전달
-    const chatroom = watchedChatrooms.find(room => room.name === item.name);
-    if (chatroom) {
-      // 원본 객체를 그대로 사용하여 불필요한 리렌더링 방지
-      setSelectedChatroom(chatroom);
-      setModalVisible(true);
-    } else {
-      showInfo('요청하신 채팅방 정보를 찾을 수 없습니다', 'info');
-    }
-  }, [watchedChatrooms, showInfo]);
-
-  /**
-   * 채팅방 추가 버튼 클릭 처리
-   * 랜덤 채팅방 이름을 생성하여 감시 목록에 추가합니다.
-   */
-  const handleAddChatroom = useCallback(async () => {
-    const newChatroomName = generateRandomChatroomName();
-    const newStatus: ChatroomStatus = {
-      id: generateChatroomId(newChatroomName),
-      isActive: true,
-      isMarkedForRemoval: false,
-    };
-    
-    const success = await updateChatroomStatus(newStatus.id, newStatus);
-    if (success) {
-      showSuccess('채팅방 추가됨', `${newChatroomName} 채팅방이 감시 목록에 추가되었습니다.`);
-    } else {
-      showError('채팅방 추가 실패', '채팅방 추가 중 오류가 발생했습니다.');
-    }
-  }, [updateChatroomStatus, showSuccess, showError]);
-
-  /**
-   * LogBox 아이템 타입에 따른 적절한 핸들러 호출
-   */
-  const handleLogBoxItemPress = useCallback((item: LogBoxItem) => {
-    switch (item.type) {
-      case 'message':
-        handleMessagePress(item);
-        break;
-      case 'announcement':
-        handleAnnouncementPress(item);
-        break;
-      case 'chatroom':
-        handleChatroomPress(item);
-        break;
-    }
-  }, [handleMessagePress, handleAnnouncementPress, handleChatroomPress]);
-
-  // 채팅방 관리 모달 이벤트 핸들러들
-  
-  /**
-   * 모달 닫기 처리
-   */
-  const handleModalClose = useCallback(() => {
-    setModalVisible(false);
-    setSelectedChatroom(undefined);
-  }, []);
-
-  /**
-   * 모달에서 저장 버튼 클릭 시 처리
-   * 
-   * @param status - 새로운 채팅방 상태
-   */
-  const handleModalSave = useCallback(async (status: ChatroomStatus) => {
-    const success = await updateChatroomStatus(status.id, status);
-    if (success) {
-      showSuccess('설정 저장됨', '채팅방 설정이 성공적으로 저장되었습니다.');
-    } else {
-      showError('설정 저장 실패', '설정 저장 중 오류가 발생했습니다.');
-    }
-    handleModalClose();
-  }, [updateChatroomStatus, showSuccess, showError]);
-
-  /**
-   * 모달에서 제거 버튼 클릭 시 처리
-   * 
-   * @param chatroomName - 제거할 채팅방 이름
-   */
-  const handleModalRemove = useCallback(async (chatroomName: string) => {
-    const chatroomId = generateChatroomId(chatroomName);
-    const success = await removeChatroom(chatroomId);
-    if (success) {
-      showSuccess('채팅방 제거됨', `${chatroomName} 채팅방이 감시 목록에서 제거되었습니다.`);
-    } else {
-      showError('제거 실패', '채팅방 제거 중 오류가 발생했습니다.');
-    }
-    handleModalClose();
-  }, [removeChatroom, showSuccess, showError]);
-
-  return {
-    modalVisible,
-    selectedChatroom,
-    handleLogBoxItemPress,
-    handleAddChatroom,
-    handleModalClose,
-    handleModalSave,
-    handleModalRemove,
-  };
-};
+// API 기반 대시보드로 전환하면서 기존 훅들은 제거되었습니다.
 
 // ===== 하위 컴포넌트들 =====
 
@@ -520,203 +201,369 @@ const LoadingScreen: React.FC = () => (
   </SafeAreaView>
 );
 
-/**
- * 대시보드 상단 헤더 컴포넌트
- */
-const DashboardHeader: React.FC = () => (
-  <View style={styles.headerContainer}>
-    <Text 
-      style={styles.headerTitle}
-      accessibilityRole="header"
-      accessibilityLabel="오늘의 대시보드"
-    >
-      Today
-    </Text>
-  </View>
-);
-
-/**
- * 대시보드 요약 카드들을 표시하는 그리드 컴포넌트
- */
-const SummaryCardsGrid: React.FC = () => (
-  <View style={styles.summaryCardsContainer}>
-    <View 
-      style={styles.summaryCardsGrid}
-      accessible
-      accessibilityLabel="대시보드 요약 통계 카드들"
-    >
-      {summaryData.map((item, index) => (
-        <View 
-          key={item.title} 
-          style={styles.summaryCardItem}
-          accessible
-        >
-          <SummaryCard
-            icon={item.icon}
-            title={item.title}
-            value={item.count}
-            color={item.color}
-          />
-        </View>
-      ))}
-    </View>
-  </View>
-);
-
-/**
- * 대시보드의 주요 섹션들을 렌더링하는 컴포넌트
- */
-interface DashboardSectionsProps {
-  /** 공지 요청 목록 */
-  announcementLogBoxItems: LogBoxItem[];
-  /** 감시 중인 채팅방 목록 */
-  chatroomLogBoxItems: LogBoxItem[];
-  /** 최근 감지된 메시지 목록 */
-  messageLogBoxItems: LogBoxItem[];
-  /** 아이템 클릭 핸들러 */
-  onItemPress: (item: LogBoxItem) => void;
-  /** 새 채팅방 추가 핸들러 */
-  onAddChatroom: () => void;
-}
-
-const DashboardSections: React.FC<DashboardSectionsProps> = ({
-  announcementLogBoxItems,
-  chatroomLogBoxItems,
-  messageLogBoxItems,
-  onItemPress,
-  onAddChatroom,
-}) => (
-  <View 
-    accessible
-    accessibilityRole="tablist"
-    accessibilityLabel="대시보드 섹션들"
-  >
-    {/* 공지 요청 섹션 */}
-    <View style={styles.sectionContainer}>
-      <DetectedMessageLogBox
-        title="공지 요청"
-        items={announcementLogBoxItems}
-        maxItems={3}
-        compact={true}
-        onItemPress={onItemPress}
-        emptyMessage="현재 공지 요청이 없습니다."
-        accessibilityLabel={`공지 요청 목록, 총 ${announcementLogBoxItems.length}개 항목`}
-      />
-    </View>
-
-    {/* 감시 중인 채팅방 섹션 */}
-    <View style={styles.sectionContainer}>
-      <DetectedMessageLogBox
-        title="감시 중인 채팅방"
-        items={chatroomLogBoxItems}
-        maxItems={3}
-        compact={true}
-        onItemPress={onItemPress}
-        addButtonProps={{
-          label: '새 채팅방 추가',
-          onPress: onAddChatroom,
-        }}
-        emptyMessage="현재 감시 중인 채팅방이 없습니다."
-        accessibilityLabel={`감시 중인 채팅방 목록, 총 ${chatroomLogBoxItems.length}개 항목`}
-      />
-    </View>
-
-    {/* 최근 감지된 메시지 섹션 */}
-    <View style={styles.sectionContainer}>
-      <DetectedMessageLogBox
-        title="최근 감지된 메시지"
-        items={messageLogBoxItems}
-        maxItems={3}
-        compact={true}
-        onItemPress={onItemPress}
-        emptyMessage="최근 감지된 메시지가 없습니다."
-        accessibilityLabel={`최근 감지된 메시지 목록, 총 ${messageLogBoxItems.length}개 항목`}
-      />
-    </View>
-  </View>
-);
-
 // ===== 메인 대시보드 화면 컴포넌트 =====
 
 /**
- * 사우론 모바일 앱의 메인 대시보드 화면
+ * 사우론 모바일 앱의 메인 대시보드 화면 (API 연동 버전)
  * 
  * 이 컴포넌트는 다음과 같은 기능을 제공합니다:
- * - 실시간 모니터링 상태 표시
+ * - 실시간 API 데이터 연동
+ * - 성능 모니터링 및 에러 추적
+ * - 풀투리프레시 지원
+ * - 오프라인 대응
  * - 공지 요청 목록 조회
  * - 감시 중인 채팅방 관리
  * - 최근 감지된 메시지 조회
- * - 각종 상호작용 및 알림 처리
  * 
  * @returns JSX.Element
  */
 export default function DashboardScreen() {
-  // 초기 로딩 상태 관리
-  const [isLoading, setIsLoading] = useState(true);
+  // ===== 상태 관리 =====
   
-  // 커스텀 훅들을 통한 기능 분리
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [performanceModalVisible, setPerformanceModalVisible] = useState(false);
+  
+  // ===== 커스텀 훅들 =====
+  
   const { showSuccess, showError, showInfo } = useToast();
   
+  // API 연동 훅
   const {
-    watchedChatrooms,
+    data,
+    isLoading,
+    isRefreshing,
+    error,
+    lastUpdated,
+    isOnline,
+    isServerOnline,
+    refresh,
+    clearError,
+    hasData,
+    needsRefresh,
+  } = useDashboardApi({
+    refreshInterval: 30000, // 30초마다 자동 새로고침
+    enableAutoRefresh: true,
+    enableOfflineMode: true,
+  });
+  
+  // 성능 모니터링 훅
+  const {
+    startMonitoring,
+    stopMonitoring,
+    isMonitoring,
+  } = usePerformanceMonitor({
+    responseTimeThreshold: 3000,
+    errorRateThreshold: 15,
+  });
+  
+  // 감지된 메시지 로그 변환
+  const { convertMessagesToLogBoxItems, convertAnnouncementsToLogBoxItems } = useDetectedMessageLog({ compact: true });
+  
+  // 감시 중인 채팅방 관리
+  const {
+    chatrooms: watchedChatrooms,
     updateChatroomStatus,
     removeChatroom,
-    messageLogBoxItems,
-    announcementLogBoxItems,
-    chatroomLogBoxItems,
-  } = useDashboardData(showError);
-
-  const {
-    modalVisible,
-    selectedChatroom,
-    handleLogBoxItemPress,
-    handleAddChatroom,
-    handleModalClose,
-    handleModalSave,
-    handleModalRemove,
-  } = useDashboardHandlers(watchedChatrooms, updateChatroomStatus, removeChatroom, showSuccess, showError, showInfo);
-
-  // 초기 로딩 화면 표시 시간 제어
+  } = useWatchedChatRooms({
+    initialChatrooms: data.watchedChatrooms.map(room => ({
+      name: room.name,
+      members: room.members,
+      lastActivity: room.lastActivity,
+      status: room.status,
+    })),
+    onError: (error, context) => {
+      showError('채팅방 관리 오류', context);
+    },
+  });
+  
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedChatroom, setSelectedChatroom] = useState<DashboardChatroom | undefined>(undefined);
+  
+  // ===== 초기화 =====
+  
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, LOADING_TIMEOUT);
-    return () => clearTimeout(timer);
+    const initializeApp = async () => {
+      try {
+        // 에러 로거 초기화
+        await initializeErrorLogger();
+        
+        // 성능 모니터링 시작 (개발 환경에서만)
+        if (PERFORMANCE_MONITORING_ENABLED) {
+          startMonitoring();
+        }
+        
+        // 초기 로딩 완료
+        setTimeout(() => {
+          setIsInitialLoading(false);
+        }, LOADING_TIMEOUT);
+        
+      } catch (error: any) {
+        showError('초기화 실패', '앱 초기화 중 오류가 발생했습니다.');
+        setIsInitialLoading(false);
+      }
+    };
+    
+    initializeApp();
+    
+    return () => {
+      if (isMonitoring) {
+        stopMonitoring();
+      }
+    };
   }, []);
-
-  // 로딩 중일 때는 로딩 화면 표시
-  if (isLoading) {
+  
+  // ===== 에러 처리 =====
+  
+  useEffect(() => {
+    if (error) {
+      showError('데이터 로드 실패', error);
+      
+      // 자동 에러 클리어
+      const timer = setTimeout(() => {
+        clearError();
+      }, ERROR_CLEAR_TIMEOUT);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [error, showError, clearError]);
+  
+  // ===== 계산된 값들 =====
+  
+  // 요약 카드 데이터 (API 데이터 기반)
+  const summaryData = useMemo(() => {
+    if (!data.stats) {
+      return [
+        { icon: Megaphone, title: '광고', count: 0, color: colors.customRed },
+        { icon: Repeat, title: '도배', count: 0, color: colors.customOrange },
+        { icon: Annoyed, title: '분쟁/욕설', count: 0, color: colors.customPurple },
+        { icon: ShieldCheck, title: '정상 처리', count: 0, color: colors.customGreen },
+      ];
+    }
+    
+    return [
+      { 
+        icon: Megaphone, 
+        title: '광고', 
+        count: data.stats.categories.advertisement, 
+        color: colors.customRed 
+      },
+      { 
+        icon: Repeat, 
+        title: '도배', 
+        count: data.stats.categories.spam, 
+        color: colors.customOrange 
+      },
+      { 
+        icon: Annoyed, 
+        title: '분쟁/욕설', 
+        count: data.stats.categories.abuse, 
+        color: colors.customPurple 
+      },
+      { 
+        icon: ShieldCheck, 
+        title: '정상 처리', 
+        count: data.stats.categories.normal, 
+        color: colors.customGreen 
+      },
+    ];
+  }, [data.stats]);
+  
+  // LogBox 아이템들 변환
+  const messageLogBoxItems = useMemo(() => 
+    convertMessagesToLogBoxItems(data.recentMessages), 
+    [data.recentMessages, convertMessagesToLogBoxItems]
+  );
+  
+  const announcementLogBoxItems = useMemo(() => 
+    convertAnnouncementsToLogBoxItems(data.announcements),
+    [data.announcements, convertAnnouncementsToLogBoxItems]
+  );
+  
+  // ===== 이벤트 핸들러들 =====
+  
+  const handleLogBoxItemPress = useCallback((item: LogBoxItem) => {
+    switch (item.type) {
+      case 'message':
+        showInfo(`${item.messageType} 메시지 상세정보`, 'info');
+        break;
+      case 'announcement':
+        showInfo('공지사항을 확인했습니다', 'info');
+        break;
+      case 'chatroom':
+        const chatroom = watchedChatrooms.find(room => room.name === item.name);
+        if (chatroom) {
+          setSelectedChatroom(chatroom);
+          setModalVisible(true);
+        }
+        break;
+    }
+  }, [watchedChatrooms, showInfo]);
+  
+  const handleAddChatroom = useCallback(() => {
+    showInfo('채팅방 추가 기능', '새로운 채팅방을 감시 목록에 추가합니다.');
+  }, [showInfo]);
+  
+  const handleModalClose = useCallback(() => {
+    setModalVisible(false);
+    setSelectedChatroom(undefined);
+  }, []);
+  
+  const handleModalSave = useCallback(async (status: ChatroomStatus) => {
+    const success = await updateChatroomStatus(status.id, status);
+    if (success) {
+      showSuccess('설정 저장됨', '채팅방 설정이 성공적으로 저장되었습니다.');
+    }
+    handleModalClose();
+  }, [updateChatroomStatus, showSuccess]);
+  
+  const handleModalRemove = useCallback(async (chatroomName: string) => {
+    const success = await removeChatroom(chatroomName);
+    if (success) {
+      showSuccess('채팅방 제거됨', `${chatroomName} 채팅방이 제거되었습니다.`);
+    }
+    handleModalClose();
+  }, [removeChatroom, showSuccess]);
+  
+  // ===== 렌더링 헬퍼 함수들 =====
+  
+  const renderConnectionStatus = () => (
+    <View style={styles.connectionStatus}>
+      <View style={styles.connectionIndicator}>
+        {isOnline ? (
+          <Wifi size={16} color={colors.customGreen} />
+        ) : (
+          <WifiOff size={16} color={colors.customRed} />
+        )}
+        <Text style={styles.connectionText}>
+          {isOnline ? '온라인' : '오프라인'}
+        </Text>
+      </View>
+      
+      {isOnline && (
+        <View style={styles.connectionIndicator}>
+          <View 
+            style={[
+              styles.serverIndicator,
+              { backgroundColor: isServerOnline ? colors.customGreen : colors.customRed }
+            ]}
+          />
+          <Text style={styles.connectionText}>
+            서버 {isServerOnline ? '연결됨' : '연결 안됨'}
+          </Text>
+        </View>
+      )}
+      
+      {lastUpdated && (
+        <Text style={styles.lastUpdatedText}>
+          마지막 업데이트: {lastUpdated.toLocaleTimeString()}
+        </Text>
+      )}
+    </View>
+  );
+  
+  // ===== 조건부 렌더링 =====
+  
+  // 초기 로딩 화면
+  if (isInitialLoading) {
     return <LoadingScreen />;
   }
-
-  // 메인 대시보드 화면 렌더링
+  
+  // 메인 대시보드 화면
   return (
     <SafeAreaView 
       style={styles.screenContainer}
       accessibilityLabel="사우론 대시보드 메인 화면"
     >
       {/* 상단 헤더 */}
-      <DashboardHeader />
+      <View style={styles.headerContainer}>
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerTitle}>Today</Text>
+          {PERFORMANCE_MONITORING_ENABLED && (
+            <TouchableOpacity
+              style={styles.performanceButton}
+              onPress={() => setPerformanceModalVisible(true)}
+            >
+              <Activity size={20} color={colors.primary} />
+            </TouchableOpacity>
+          )}
+        </View>
+        {renderConnectionStatus()}
+      </View>
 
       {/* 스크롤 가능한 메인 콘텐츠 영역 */}
       <ScrollView 
         style={{ flex: 1 }}
         contentContainerStyle={styles.contentContainer}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={refresh}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+          />
+        }
         accessibilityLabel="대시보드 메인 콘텐츠 영역"
         showsVerticalScrollIndicator={true}
-        accessible={true}
       >
-        {/* 대시보드 요약 카드 그리드 */}
-        <SummaryCardsGrid />
+        {/* 요약 카드 그리드 */}
+        <View style={styles.summaryCardsContainer}>
+          <View style={styles.summaryCardsGrid}>
+            {summaryData.map((item, index) => (
+              <View key={item.title} style={styles.summaryCardItem}>
+                <SummaryCard
+                  icon={item.icon}
+                  title={item.title}
+                  value={item.count}
+                  color={item.color}
+                />
+              </View>
+            ))}
+          </View>
+        </View>
         
-        {/* 각종 데이터 섹션들 */}
-        <DashboardSections
-          announcementLogBoxItems={announcementLogBoxItems}
-          chatroomLogBoxItems={chatroomLogBoxItems}
-          messageLogBoxItems={messageLogBoxItems}
-          onItemPress={handleLogBoxItemPress}
-          onAddChatroom={handleAddChatroom}
-        />
+        {/* 데이터 섹션들 */}
+        <View style={styles.sectionContainer}>
+          <DetectedMessageLogBox
+            title="공지 요청"
+            items={announcementLogBoxItems}
+            maxItems={3}
+            compact={true}
+            onItemPress={handleLogBoxItemPress}
+            emptyMessage="현재 공지 요청이 없습니다."
+          />
+        </View>
+
+        <View style={styles.sectionContainer}>
+          <DetectedMessageLogBox
+            title="감시 중인 채팅방"
+            items={data.watchedChatrooms.map(room => ({
+              id: `chatroom-${room.name}`,
+              type: 'chatroom' as const,
+              name: room.name,
+              subtitle: `${room.members}명 • ${room.lastActivity}`,
+              status: room.status,
+            }))}
+            maxItems={3}
+            compact={true}
+            onItemPress={handleLogBoxItemPress}
+            addButtonProps={{
+              label: '새 채팅방 추가',
+              onPress: handleAddChatroom,
+            }}
+            emptyMessage="현재 감시 중인 채팅방이 없습니다."
+          />
+        </View>
+
+        <View style={styles.sectionContainer}>
+          <DetectedMessageLogBox
+            title="최근 감지된 메시지"
+            items={messageLogBoxItems}
+            maxItems={3}
+            compact={true}
+            onItemPress={handleLogBoxItemPress}
+            emptyMessage="최근 감지된 메시지가 없습니다."
+          />
+        </View>
       </ScrollView>
 
       {/* 채팅방 관리 모달 */}
@@ -726,8 +573,16 @@ export default function DashboardScreen() {
         chatroom={selectedChatroom}
         onSave={handleModalSave}
         onRemove={handleModalRemove}
-        accessibilityLabel="감시 중인 채팅방 관리 모달 대화상자"
       />
+      
+      {/* 성능 모니터링 대시보드 */}
+      {PERFORMANCE_MONITORING_ENABLED && (
+        <PerformanceMonitorDashboard
+          visible={performanceModalVisible}
+          onClose={() => setPerformanceModalVisible(false)}
+          isDeveloperMode={true}
+        />
+      )}
     </SafeAreaView>
   );
 }
