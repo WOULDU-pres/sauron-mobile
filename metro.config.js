@@ -5,9 +5,10 @@ const path = require('path');
 // Get the default Expo Metro config for SDK 53
 const config = getDefaultConfig(__dirname);
 
-// Add custom alias for the tilde (~) path
+// Add custom alias for the tilde (~) path and shared modules
 config.resolver.alias = {
   '~': path.resolve(__dirname, '~'),
+  '@shared': path.resolve(__dirname, '../shared'),
 };
 
 // Add additional asset extensions if needed

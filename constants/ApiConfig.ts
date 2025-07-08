@@ -4,6 +4,7 @@
  */
 
 import { Platform } from 'react-native';
+import { API_CONSTANTS, TIME_CONSTANTS } from '@shared/constants';
 
 // Environment configuration
 const getEnvironment = () => {
@@ -33,29 +34,32 @@ export const API_CONFIG = {
   BASE_URL: config.BASE_URL,
   TIMEOUT: config.TIMEOUT,
   
-  // API endpoints
+  // API endpoints - using shared constants
   ENDPOINTS: {
-    MESSAGES: '/v1/messages',
+    MESSAGES: API_CONSTANTS.BASE_PATH + API_CONSTANTS.ENDPOINTS.MESSAGES,
     AUTH: {
-      LOGIN: '/v1/auth/login',
-      REFRESH: '/v1/auth/refresh',
-      LOGOUT: '/v1/auth/logout',
+      LOGIN: API_CONSTANTS.BASE_PATH + API_CONSTANTS.ENDPOINTS.AUTH + '/login',
+      REFRESH: API_CONSTANTS.BASE_PATH + API_CONSTANTS.ENDPOINTS.AUTH + '/refresh',
+      LOGOUT: API_CONSTANTS.BASE_PATH + API_CONSTANTS.ENDPOINTS.AUTH + '/logout',
     },
+    HEALTH: API_CONSTANTS.ENDPOINTS.HEALTH,
+    METRICS: API_CONSTANTS.ENDPOINTS.METRICS,
   },
   
-  // HTTP configuration
+  // HTTP configuration - using shared constants
   HEADERS: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
     'User-Agent': `Sauron-Mobile/${Platform.OS}`,
+    [API_CONSTANTS.HEADERS.X_CLIENT_VERSION]: '1.0.0',
   },
   
-  // Retry configuration
+  // Retry configuration - using shared constants
   RETRY: {
     MAX_ATTEMPTS: 3,
-    INITIAL_DELAY: 1000, // 1 second
-    MAX_DELAY: 5000, // 5 seconds
-    BACKOFF_FACTOR: 2, // Exponential backoff
+    INITIAL_DELAY: TIME_CONSTANTS.MILLISECONDS.SECOND,
+    MAX_DELAY: 5 * TIME_CONSTANTS.MILLISECONDS.SECOND,
+    BACKOFF_FACTOR: 2,
   },
   
   // Network configuration
@@ -65,11 +69,11 @@ export const API_CONFIG = {
     ENABLE_OFFLINE_QUEUE: true,
   },
   
-  // JWT configuration
+  // JWT configuration - using shared constants
   JWT: {
     STORAGE_KEY: '@sauron_jwt_token',
     REFRESH_STORAGE_KEY: '@sauron_refresh_token',
-    TOKEN_EXPIRE_MARGIN: 60000, // 1 minute before expiry
+    TOKEN_EXPIRE_MARGIN: TIME_CONSTANTS.MILLISECONDS.MINUTE,
   },
 } as const;
 

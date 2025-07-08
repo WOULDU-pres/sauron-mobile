@@ -7,6 +7,19 @@ import httpClient, { ApiError } from './httpClient';
 import { API_CONFIG } from '../../../constants/ApiConfig';
 import type { NotificationData } from '~/types/NotificationBridge';
 
+// Import shared utilities and constants
+import { 
+  StringUtils, 
+  DateTimeUtils, 
+  CryptoUtils,
+  PerformanceUtils 
+} from '@shared/utils';
+import { 
+  ERROR_CODES, 
+  HTTP_STATUS,
+  MESSAGE_CONSTANTS 
+} from '@shared/constants';
+
 // Request/Response types for API communication
 export interface MessageTransmissionRequest {
   messageId: string;
@@ -15,7 +28,7 @@ export interface MessageTransmissionRequest {
   senderHash: string;
   content: string;
   timestamp: string;
-  messageType?: 'normal' | 'announcement';
+  messageType?: keyof typeof MESSAGE_CONSTANTS.TYPES;
   metadata?: {
     deviceId?: string;
     appVersion?: string;
@@ -28,7 +41,7 @@ export interface MessageTransmissionResponse {
   messageId: string;
   transmissionId: string;
   analysisResult?: {
-    detectedType: 'normal' | 'spam' | 'ad' | 'abuse' | 'conflict';
+    detectedType: keyof typeof MESSAGE_CONSTANTS.TYPES;
     confidence: number;
     reason: string;
   };
@@ -63,7 +76,7 @@ export function convertNotificationToApiRequest(
     senderHash,
     content: notification.message,
     timestamp: notification.formattedTime,
-    messageType: notification.isAnnouncement ? 'announcement' : 'normal',
+    messageType: notification.isAnnouncement ? MESSAGE_CONSTANTS.TYPES.ANNOUNCEMENT : MESSAGE_CONSTANTS.TYPES.NORMAL,
     metadata: {
       deviceId,
       appVersion,
@@ -73,14 +86,14 @@ export function convertNotificationToApiRequest(
 }
 
 /**
- * Create anonymized hash for sender identification
+ * Create anonymized hash for sender identification using shared utilities
  */
 function createSenderHash(title: string): string {
   // Extract sender name from title (format: "SenderName: message" or "SenderName님")
   let senderName = 'unknown';
   
   if (title.includes(':')) {
-    senderName = title.split(':')[0].trim();
+    senderName = StringUtils.safeTrim(title.split(':')[0]);
   } else {
     const nameMatch = title.match(/([가-힣a-zA-Z0-9]+)님/);
     if (nameMatch) {
@@ -88,15 +101,8 @@ function createSenderHash(title: string): string {
     }
   }
   
-  // Create simple hash (in production, use proper crypto)
-  let hash = 0;
-  for (let i = 0; i < senderName.length; i++) {
-    const char = senderName.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32-bit integer
-  }
-  
-  return Math.abs(hash).toString(16);
+  // Use shared crypto utility for consistent hashing
+  return CryptoUtils.simpleHash(senderName);
 }
 
 /**
@@ -143,7 +149,7 @@ class MessageService {
       // Validate response structure
       if (!response.success || !response.messageId) {
         throw this.createTransmissionError(
-          'INVALID_RESPONSE',
+          ERROR_CODES.INVALID_FORMAT,
           'Server returned invalid response format',
           notification.id,
           false
@@ -230,7 +236,7 @@ class MessageService {
 
     // Generic error
     return this.createTransmissionError(
-      'TRANSMISSION_FAILED',
+      ERROR_CODES.INTERNAL_SERVER_ERROR,
       error.message || 'Unknown transmission error',
       messageId,
       false
@@ -243,8 +249,15 @@ class MessageService {
   private isRetryableError(error: ApiError): boolean {
     // Network errors and server errors (5xx) are typically retryable
     // Authentication errors (401) and client errors (4xx) are typically not retryable
-    const retryableCodes = ['NETWORK_ERROR', 'SERVER_ERROR'];
-    const retryableStatusCodes = [500, 502, 503, 504, 408, 429];
+    const retryableCodes = [ERROR_CODES.SERVICE_UNAVAILABLE, ERROR_CODES.INTERNAL_SERVER_ERROR];
+    const retryableStatusCodes = [
+      HTTP_STATUS.INTERNAL_SERVER_ERROR, 
+      HTTP_STATUS.BAD_GATEWAY, 
+      HTTP_STATUS.SERVICE_UNAVAILABLE, 
+      HTTP_STATUS.GATEWAY_TIMEOUT,
+      408, // Request Timeout
+      HTTP_STATUS.TOO_MANY_REQUESTS
+    ];
 
     return (
       retryableCodes.includes(error.code) ||

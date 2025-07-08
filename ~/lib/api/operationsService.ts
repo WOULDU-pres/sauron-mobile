@@ -1,5 +1,9 @@
 import httpClient from './httpClient';
 
+// Import shared constants and utilities
+import { HTTP_STATUS, ERROR_CODES, API_CONSTANTS } from '@shared/constants';
+import { DateTimeUtils, StringUtils } from '@shared/utils';
+
 // Types for operations dashboard
 export interface OperationsDashboardData {
   totalMessages: number;
@@ -74,20 +78,20 @@ class OperationsService {
   private handleError(error: any): never {
     console.error('Operations service error:', error);
     
-    if (error.response?.status === 401) {
+    if (error.response?.status === HTTP_STATUS.UNAUTHORIZED) {
       throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
     }
     
-    if (error.response?.status === 403) {
+    if (error.response?.status === HTTP_STATUS.FORBIDDEN) {
       throw new Error('관리자 권한이 필요합니다.');
     }
     
-    if (error.response?.status === 404) {
+    if (error.response?.status === HTTP_STATUS.NOT_FOUND) {
       throw new Error('요청한 데이터를 찾을 수 없습니다.');
     }
     
     if (error.response?.data?.message) {
-      throw new Error(error.response.data.message);
+      throw new Error(StringUtils.safeTrim(error.response.data.message));
     }
     
     throw new Error('운영 대시보드 데이터를 불러오는 중 오류가 발생했습니다.');
@@ -99,7 +103,7 @@ class OperationsService {
   ): Promise<OperationsDashboardData> {
     try {
       const response = await httpClient.get<OperationsDashboardData>(
-        `/v1/operations/dashboard?startDate=${startDate}&endDate=${endDate}`
+        `${API_CONSTANTS.BASE_PATH}/operations/dashboard?startDate=${startDate}&endDate=${endDate}`
       );
       return response;
     } catch (error) {

@@ -7,13 +7,19 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError } f
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_CONFIG, buildApiUrl, getRetryDelay } from '../../../constants/ApiConfig';
 
-// Types for authentication
-export interface AuthTokens {
-  accessToken: string;
-  refreshToken?: string;
-  expiresAt?: number;
-}
+// Import shared types and constants
+import type { 
+  AuthTokens, 
+  ErrorResponse,
+  ApiResponse
+} from '@shared/types';
+import { 
+  ERROR_CODES, 
+  HTTP_STATUS,
+  API_CONSTANTS 
+} from '@shared/constants';
 
+// Legacy API error interface for backward compatibility
 export interface ApiError {
   code: string;
   message: string;
@@ -62,7 +68,7 @@ class HttpClient {
         const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
 
         // Handle 401 Unauthorized - attempt token refresh
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        if (error.response?.status === HTTP_STATUS.UNAUTHORIZED && !originalRequest._retry) {
           originalRequest._retry = true;
 
           try {
@@ -74,7 +80,7 @@ class HttpClient {
           } catch (refreshError) {
             // Refresh failed, redirect to login
             await this.handleAuthenticationFailure();
-            return Promise.reject(this.createApiError('AUTH_FAILED', 'Authentication failed', 401));
+            return Promise.reject(this.createApiError(ERROR_CODES.UNAUTHORIZED, 'Authentication failed', HTTP_STATUS.UNAUTHORIZED));
           }
         }
 
@@ -238,7 +244,7 @@ class HttpClient {
       // Server responded with error status
       const errorData = error.response.data as any;
       return this.createApiError(
-        errorData?.code || 'SERVER_ERROR',
+        errorData?.code || ERROR_CODES.INTERNAL_SERVER_ERROR,
         errorData?.message || error.message,
         error.response.status,
         error.response.data
@@ -246,7 +252,7 @@ class HttpClient {
     } else if (error.request) {
       // Network error
       return this.createApiError(
-        'NETWORK_ERROR',
+        ERROR_CODES.SERVICE_UNAVAILABLE,
         'Network connection failed',
         0,
         error.request
@@ -254,7 +260,7 @@ class HttpClient {
     } else {
       // Request setup error
       return this.createApiError(
-        'REQUEST_ERROR',
+        ERROR_CODES.INVALID_INPUT,
         error.message,
         0,
         error

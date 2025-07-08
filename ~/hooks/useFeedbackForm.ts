@@ -18,6 +18,9 @@
 
 import { useState, useCallback, useMemo } from 'react';
 
+// Import shared validation utilities
+import { Validator, quickValidate, validationResultToErrors } from '@shared/validation';
+
 // ===== 타입 정의 =====
 
 /**
@@ -116,63 +119,21 @@ const INITIAL_FORM_STATE: FeedbackFormState = {
 // ===== 유틸리티 함수들 =====
 
 /**
- * 피드백 타입 유효성 검사
- */
-const validateType = (type: FeedbackType | null): string | undefined => {
-  if (!type) {
-    return '피드백 유형을 선택해주세요.';
-  }
-  return undefined;
-};
-
-/**
- * 제목 유효성 검사
- */
-const validateTitle = (title: string): string | undefined => {
-  if (!title.trim()) {
-    return '제목을 입력해주세요.';
-  }
-  if (title.trim().length < TITLE_MIN_LENGTH) {
-    return `제목은 최소 ${TITLE_MIN_LENGTH}자 이상 입력해주세요.`;
-  }
-  if (title.length > TITLE_MAX_LENGTH) {
-    return `제목은 최대 ${TITLE_MAX_LENGTH}자까지 입력 가능합니다.`;
-  }
-  return undefined;
-};
-
-/**
- * 내용 유효성 검사
- */
-const validateContent = (content: string): string | undefined => {
-  if (!content.trim()) {
-    return '내용을 입력해주세요.';
-  }
-  if (content.trim().length < CONTENT_MIN_LENGTH) {
-    return `내용은 최소 ${CONTENT_MIN_LENGTH}자 이상 입력해주세요.`;
-  }
-  if (content.length > CONTENT_MAX_LENGTH) {
-    return `내용은 최대 ${CONTENT_MAX_LENGTH}자까지 입력 가능합니다.`;
-  }
-  return undefined;
-};
-
-/**
- * 전체 폼 유효성 검사
+ * 전체 폼 유효성 검사 (shared validation 사용)
  */
 const validateForm = (data: FeedbackFormData): FeedbackFormErrors => {
-  const errors: FeedbackFormErrors = {};
+  // Convert data to format compatible with shared validation
+  const feedbackData = {
+    type: data.type || '',
+    title: data.title,
+    content: data.content,
+  };
+
+  // Use shared validation
+  const result = quickValidate.feedback(feedbackData);
   
-  const typeError = validateType(data.type);
-  if (typeError) errors.type = typeError;
-  
-  const titleError = validateTitle(data.title);
-  if (titleError) errors.title = titleError;
-  
-  const contentError = validateContent(data.content);
-  if (contentError) errors.content = contentError;
-  
-  return errors;
+  // Convert shared validation result to form errors
+  return validationResultToErrors(result);
 };
 
 /**
